@@ -1,0 +1,49 @@
+type token =
+    WHILE
+  | VAR
+  | UMINUS
+  | TYPE
+  | TO
+  | TIMES
+  | THEN
+  | STRING of string
+  | SEMICOLON
+  | RPAREN
+  | RBRACK
+  | RBRACE
+  | PLUS
+  | OR
+  | OF
+  | NIL
+  | NEQ
+  | MINUS
+  | LT
+  | LPAREN
+  | LET
+  | LE
+  | LBRACK
+  | LBRACE
+  | INT of int
+  | IN
+  | IF
+  | ID of string
+  | GT
+  | GE
+  | FUNCTION
+  | FOR
+  | EQ
+  | EOF
+  | END
+  | ELSE
+  | DOT
+  | DO
+  | DIVIDE
+  | COMMA
+  | COLON
+  | BREAK
+  | ASSIGN
+  | ARRAY
+  | AND
+val menhir_begin_marker : int
+val xv_main : Syntax.raw_expr
+val menhir_end_marker : int
