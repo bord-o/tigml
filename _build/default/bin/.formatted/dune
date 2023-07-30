@@ -1,4 +1,0 @@
-(executable
- (public_name tigml)
- (name lex_parse)
- (libraries tigml))

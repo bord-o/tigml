@@ -11,8 +11,7 @@
 %token BREAK NIL
 %token FUNCTION VAR TYPE 
 
-%start <Syntax.expr> main
-%{ open Syntax %}
+%start <unit> main
 
 %%
 
@@ -21,7 +20,7 @@
 (* We wish to parse an expression followed with an end-of-line. *)
 
 main:
-  | INT {ELiteral $1}
-  | EOF {Nothing}
+  | INT {()}
+  | EOF {()}
 
 	
