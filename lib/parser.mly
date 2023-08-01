@@ -1,3 +1,9 @@
+
+%{
+	let debug = true
+	let pp = if debug then print_endline else (fun _->())
+%}
+
 %token EOF 
 %token <string> ID
 %token <int> INT 
@@ -13,7 +19,8 @@
 %left EQ NEQ
 %left LT GT LE GE
 %left PLUS MINUS
-%left TIMES DIV
+%left TIMES DIVIDE
+%right SEMICOLON
 %right UMINUS
 
 
@@ -26,95 +33,94 @@
 (* We wish to parse an expression followed with an end-of-line. *)
 
 main:
-  | exp EOF {()}
+  | exp EOF {(pp "main -> exp EOF")}
 
 exp : 
-	STRING {()}
-	| INT {()}
-	| ID {()}
-	| BREAK {()}
-	| UMINUS exp {()}
-	| exp EQ exp {()}
-	| exp NEQ exp {()}
-	| exp TIMES exp {()}
-	| exp MINUS exp {()}
-	| exp DIVIDE exp {()}
-	| exp PLUS exp {()}
-	| exp GT exp {()}
-	| exp LT exp {()}
-	| exp GE exp {()}
-	| exp LE exp {()}
-	| exp AND exp {()}
-	| exp OR exp {()}
+	| STRING {(pp "exp -> string")}
+	| INT {(pp "exp -> int")}
+	| ID {(pp "exp -> ID")}
+	| BREAK {(pp "exp -> Break")}
+	| UMINUS exp {(pp "exp -> uminus exp")}
+	| exp EQ exp {(pp "exp -> beq")}
+	| exp NEQ exp {(pp "exp -> bneq")}
+	| exp TIMES exp {(pp "exp -> btimes")}
+	| exp MINUS exp {(pp "exp -> bminus")}
+	| exp DIVIDE exp {(pp "exp -> bdivide")}
+	| exp PLUS exp {(pp "exp -> bplus")}
+	| exp GT exp {(pp "exp -> gt")}
+	| exp LT exp {(pp "exp -> lt")}
+	| exp GE exp {(pp "exp -> ge")}
+	| exp LE exp {(pp "exp -> le")}
+	| exp AND exp {(pp "exp -> and")}
+	| exp OR exp {(pp "exp -> or")}
+		
+	| ID LBRACK exp RBRACK OF exp {(pp "exp -> id[ex] of exp ")}
+	| ID LBRACE recordargs RBRACE {(pp "exp ->id{recordargs}")}
+	| ID LPAREN explist RPAREN {(pp "exp -> id(explist)")}
 	
-	
+	| FOR ID ASSIGN exp TO exp DO exp {(pp "exp -> for")}
+	| IF exp THEN exp ELSE exp {(pp "exp -> if then else")}
+	| IF exp THEN exp {(pp "exp -> if then")}
+	| WHILE exp DO exp {(pp "exp -> while")}
+	| lvalue_exp {(pp "exp -> lvalue_exp")}
+	| lvalue ASSIGN exp {(pp "exp -> assignment")}
+	| LET decs IN optexp END {(pp "exp ->declaration")}
+	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
+	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
 
-	| ID LBRACK exp RBRACK OF exp {()}
-	| ID LBRACE recordargs RBRACE {()}
-	| ID LPAREN explist RPAREN {()}
-	
-	| FOR ID ASSIGN exp TO exp DO exp {()}
-	| IF exp THEN exp ELSE exp {()}
-	| IF exp THEN exp {()}
-	| WHILE exp DO exp {()}
-	| lvalue_exp {()}
-	| lvalue ASSIGN exp {()}
-	| LET decs IN optexp END {()}
-	| LPAREN optexp RPAREN {()}
-	| exp SEMICOLON exp {()}
-
-	| NIL {()}
+	| NIL {(pp "exp -> exp")}
 
 optexp :
-	empty {()}
-	| exp {()}
+	| empty {(pp "optexp -> empty")}
+	| exp {(pp "optexp -> exp")}
 	
 explist :
-	empty {()}
-	| exp {()}
-	| exp COMMA explist {()}
+	| empty {(pp "explist -> empty")}
+	| exp {(pp "explist -> single")}
+	| exp COMMA explist {(pp "explist multiple")}
 	
 decs : 
-	dec {()}
-	| decs dec {()}
+	| dec {(pp "decs -> single")}
+	| decs dec {(pp "decs -> multiple")}
 
 dec : 
-	tydec	{()}
-	| vardec	{()}
-	| fundec	{()}
+	| tydec	{(pp "dec -> type")}
+	| vardec	{(pp "dec -> var")}
+	| fundec	{(pp "dec -> func")}
 
-tydec : TYPE ID EQ ty	{()}
+tydec : 
+	| TYPE ID EQ ty	{(pp "tydec")}
 
 ty : 
-	ID	{()}
-	| LBRACE tyfields RBRACE {()}
-	| ARRAY OF ID	{()}
+	| ID	{(pp "ty -> id")}
+	| LBRACE tyfields RBRACE {(pp "ty -> {tyfields}")}
+	| ARRAY OF ID	{(pp "ty -> array of id")}
 
 tyfields : 
-	empty	{()}
-	| ID COLON ID COMMA tyfields	{()}
-	| ID COLON ID 	{()}
+	| empty	{(pp "tyfields -> empty")}
+	| ID COLON ID COMMA tyfields	{(pp "tyfields -> with comma")}
+	| ID COLON ID 	{(pp "tyfields -> single")}
 
 vardec :
-	VAR ID ASSIGN exp	{()}
-	| VAR ID COLON ID ASSIGN exp	{()}
+	| VAR ID ASSIGN exp	{(pp "vardec -> no type")}
+	| VAR ID COLON ID ASSIGN exp	{(pp "vardec w/type")}
 
 fundec :
-	FUNCTION ID LPAREN tyfields RPAREN EQ exp	{()}
-	| FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp	{()}
+	| FUNCTION ID LPAREN tyfields RPAREN EQ exp	{(pp "funcdec -> notype")}
+	| FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp	{(pp "funcdec -> w/type")}
 
 lvalue :
-	ID {()}
-	| lvalue_exp {()}
+	| ID {(pp "lvalue -> id")}
+	| lvalue_exp {(pp "lvalue -> lvalue_exp")}
 
 lvalue_exp :
-	lvalue DOT ID {()}
-	| lvalue_exp LBRACK exp RBRACK {()}
-	| ID LBRACK exp RBRACK {()}
+	| lvalue DOT ID {(pp "lvalue_exp -> lvalue.id")}
+	| lvalue_exp LBRACK exp RBRACK {(pp "lvalue_exp -> lvalue[exp]")}
+	| ID LBRACK exp RBRACK {(pp "lvalue_exp -> id[exp]")}
 	
 recordargs :
-	empty {()}
-	| ID EQ exp {()}
-	| ID EQ exp COMMA recordargs {()}
+	| empty {(pp "recordargs -> empty")}
+	| ID EQ exp {(pp "recordargs -> single")}
+	| ID EQ exp COMMA recordargs {(pp "recordargs -> multiple ")}
 	
-empty : {()}
+empty : {(pp "empty")}
