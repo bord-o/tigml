@@ -159,7 +159,7 @@ rule token = parse
 
 | eof
     (* Normal case: no data, eof. *)
-    { raise (Error (locate lexbuf; Printf.sprintf "At offset %d: End of file encountered.\n" (Lexing.lexeme_start lexbuf))) }
+    {pp "eof"; EOF}
 | _
     { raise (Error (locate lexbuf; Printf.sprintf "At offset %d: unexpected character.\n" (Lexing.lexeme_start lexbuf) )) }
 

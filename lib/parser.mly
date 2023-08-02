@@ -1,4 +1,3 @@
-
 %{
 	let debug = true
 	let pp = if debug then print_endline else (fun _->())
@@ -8,21 +7,30 @@
 %token <string> ID
 %token <int> INT 
 %token <string> STRING
+%token LET IN END ARRAY IF THEN ELSE WHILE FOR TO DO OF 
 %token COMMA COLON SEMICOLON LPAREN RPAREN LBRACK RBRACK 
 %token LBRACE RBRACE DOT 
 %token PLUS MINUS UMINUS TIMES DIVIDE EQ NEQ LT LE GT GE
 %token AND OR ASSIGN
-%token ARRAY IF THEN ELSE WHILE FOR TO DO LET IN END OF 
 %token BREAK NIL
 %token FUNCTION VAR TYPE 
 
-%left EQ NEQ
-%left LT GT LE GE
+%nonassoc SEMICOLON  // nonassociative for sequences of statements
+%right ASSIGN // right associative to enable variable chaining: a = b = c
+%left OR
+%left AND
+%nonassoc EQ NEQ // nonassociative, doesn't allow a == b == c
+%nonassoc LT LE GT GE // nonassociative, doesn't allow a < b < c
 %left PLUS MINUS
 %left TIMES DIVIDE
-%right SEMICOLON
-%right UMINUS
+%right UMINUS  // right associative for unary minus: a = - - b
 
+%nonassoc THEN
+%nonassoc ELSE  // Nonassociative ELSE for the 'dangling else' problem
+
+%nonassoc DO     // for the 'while' construct
+%nonassoc TO     // for the 'for' construct
+%nonassoc OF     // for the 'array of' construct
 
 %start <unit> main
 
@@ -36,6 +44,16 @@ main:
   | exp EOF {(pp "main -> exp EOF")}
 
 exp : 
+	| LET decs IN optexp END {(pp "exp ->let in end")}
+	| FOR ID ASSIGN exp TO exp DO exp %prec TO {(pp "exp -> for")}
+  | IF exp THEN exp ELSE exp %prec ELSE {(pp "exp -> if then else")}
+	| IF exp THEN exp %prec THEN {(pp "exp -> if then")}
+	| WHILE exp DO exp %prec DO {(pp "exp -> while")}
+	| lvalue_exp {(pp "exp -> lvalue_exp")}
+	| lvalue ASSIGN exp {(pp "exp -> assignment")}
+	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
+	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
+
 	| STRING {(pp "exp -> string")}
 	| INT {(pp "exp -> int")}
 	| ID {(pp "exp -> ID")}
@@ -54,19 +72,13 @@ exp :
 	| exp AND exp {(pp "exp -> and")}
 	| exp OR exp {(pp "exp -> or")}
 		
-	| ID LBRACK exp RBRACK OF exp {(pp "exp -> id[ex] of exp ")}
+	| ID LBRACK exp RBRACK OF exp %prec OF {(pp "exp -> id[ex] of exp ")}
 	| ID LBRACE recordargs RBRACE {(pp "exp ->id{recordargs}")}
 	| ID LPAREN explist RPAREN {(pp "exp -> id(explist)")}
+
+
+
 	
-	| FOR ID ASSIGN exp TO exp DO exp {(pp "exp -> for")}
-	| IF exp THEN exp ELSE exp {(pp "exp -> if then else")}
-	| IF exp THEN exp {(pp "exp -> if then")}
-	| WHILE exp DO exp {(pp "exp -> while")}
-	| lvalue_exp {(pp "exp -> lvalue_exp")}
-	| lvalue ASSIGN exp {(pp "exp -> assignment")}
-	| LET decs IN optexp END {(pp "exp ->declaration")}
-	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
-	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
 
 	| NIL {(pp "exp -> exp")}
 
@@ -81,7 +93,7 @@ explist :
 	
 decs : 
 	| dec {(pp "decs -> single")}
-	| decs dec {(pp "decs -> multiple")}
+	| decs dec {(pp @@ "decs -> multiple")}
 
 dec : 
 	| tydec	{(pp "dec -> type")}
@@ -103,7 +115,7 @@ tyfields :
 
 vardec :
 	| VAR ID ASSIGN exp	{(pp "vardec -> no type")}
-	| VAR ID COLON ID ASSIGN exp	{(pp "vardec w/type")}
+	| VAR ID COLON ID ASSIGN exp	{(pp "vardec -> w/type")}
 
 fundec :
 	| FUNCTION ID LPAREN tyfields RPAREN EQ exp	{(pp "funcdec -> notype")}
