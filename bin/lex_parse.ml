@@ -71,11 +71,6 @@ let () =
       "/home/bordo/tigml/test/test41.tig";
       "/home/bordo/tigml/test/test42.tig";
     ]
-  (*
-  [
-      "/home/bordo/tigml/test/test42.tig";
-  ]
-  *)
   in
   List.iter
       (fun program ->

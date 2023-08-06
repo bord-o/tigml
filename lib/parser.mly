@@ -16,7 +16,6 @@
 %token FUNCTION VAR TYPE 
 
 %nonassoc SEMICOLON  // nonassociative for sequences of statements
-%right ASSIGN // right associative to enable variable chaining: a = b = c
 %left OR
 %left AND
 %nonassoc EQ NEQ // nonassociative, doesn't allow a == b == c
@@ -53,6 +52,7 @@ exp :
 	| lvalue ASSIGN exp {(pp "exp -> assignment")}
 	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
 	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
+	| recordexp {(pp "exp -> recordexp")}
 
 	| STRING {(pp "exp -> string")}
 	| INT {(pp "exp -> int")}
@@ -73,14 +73,12 @@ exp :
 	| exp OR exp {(pp "exp -> or")}
 		
 	| ID LBRACK exp RBRACK OF exp %prec OF {(pp "exp -> id[ex] of exp ")}
-	| ID LBRACE recordargs RBRACE {(pp "exp ->id{recordargs}")}
-	| ID LPAREN explist RPAREN {(pp "exp -> id(explist)")}
-
-
-
-	
 
 	| NIL {(pp "exp -> exp")}
+
+recordexp : ID LPAREN explist RPAREN {(pp "recordexp -> id(explist)")}
+          | ID LBRACE recordargs RBRACE {(pp "recordexp -> id{recordargs}")}
+          | ID NIL {(pp "recordexp -> id nil")}
 
 optexp :
 	| empty {(pp "optexp -> empty")}
