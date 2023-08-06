@@ -1,5 +1,5 @@
 %{
-	let debug = true
+	let debug = false
 	let pp = if debug then print_endline else (fun _->())
 %}
 

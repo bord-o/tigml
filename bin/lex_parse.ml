@@ -1,6 +1,5 @@
 open Tigml
 open Tigml.Syntax
-
 let process buf =
   try
     (* Run the parser on this line of input. *)
@@ -72,6 +71,11 @@ let () =
       "/home/bordo/tigml/test/test41.tig";
       "/home/bordo/tigml/test/test42.tig";
     ]
+  (*
+  [
+      "/home/bordo/tigml/test/test42.tig";
+  ]
+  *)
   in
   List.iter
       (fun program ->
