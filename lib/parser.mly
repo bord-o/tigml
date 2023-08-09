@@ -25,6 +25,7 @@
 %nonassoc EQ NEQ GT GE LT LE
 %left PLUS MINUS
 %left TIMES DIVIDE
+%nonassoc TO
 %left UMINUS
 
 
