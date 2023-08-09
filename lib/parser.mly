@@ -23,6 +23,7 @@
 %left PLUS MINUS
 %left TIMES DIVIDE
 %right UMINUS  // right associative for unary minus: a = - - b
+%right ASSIGN
 
 %nonassoc THEN
 %nonassoc ELSE  // Nonassociative ELSE for the 'dangling else' problem
@@ -50,7 +51,7 @@ exp :
 	| WHILE exp DO exp %prec DO {(pp "exp -> while")}
 	| lvalue_exp {(pp "exp -> lvalue_exp")}
 	| lvalue ASSIGN exp {(pp "exp -> assignment")}
-	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
+	| LPAREN exp RPAREN {(pp "exp -> (optexp)")}
 	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
 	| recordexp {(pp "exp -> recordexp")}
 

@@ -27,6 +27,7 @@ let () =
 
   let progs =
     [
+    (*
       "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test2.tig";
       "/home/bordo/tigml/test/test3.tig";
@@ -70,6 +71,15 @@ let () =
       "/home/bordo/tigml/test/test40.tig";
       "/home/bordo/tigml/test/test41.tig";
       "/home/bordo/tigml/test/test42.tig";
+      "/home/bordo/tigml/test/test43.tig";
+      "/home/bordo/tigml/test/test44.tig";
+      "/home/bordo/tigml/test/test45.tig";
+      "/home/bordo/tigml/test/test46.tig";
+      "/home/bordo/tigml/test/test47.tig";
+      "/home/bordo/tigml/test/test48.tig";
+      "/home/bordo/tigml/test/test49.tig";
+    *)
+      "/home/bordo/tigml/test/merge.tig";
     ]
   in
   List.iter
