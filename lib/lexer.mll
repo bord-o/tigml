@@ -3,7 +3,7 @@
   open Lexing
 
   exception Error of string
-  let debug = false
+  let debug = true
   let pp = if debug then print_endline else (fun _ -> ())
 
   let comment_depth = ref 0
@@ -36,135 +36,135 @@ rule token = parse
     { token lexbuf }
 
 | nl
-    {pp "newline"; next_line lexbuf; token lexbuf }
+    {next_line lexbuf; token lexbuf }
     
 | "if"
-    {pp "if"; IF}
+    {pp "IF"; IF}
 | "var"
-    {pp "var"; VAR}
+    {pp "VAR"; VAR}
 | "function"
-    {pp "function"; FUNCTION}
+    {pp "FUNCTION"; FUNCTION}
 
 (*string time*)
 | '"'
-    {pp "string start"; string_active := true; read_string (Buffer.create 17) lexbuf}
+    {string_active := true; read_string (Buffer.create 17) lexbuf}
 
 | "/*"
-    {pp "starting comment"; comment_active := true; comment_depth := !comment_depth + 1; comment lexbuf}
+    {comment_active := true; comment_depth := !comment_depth + 1; comment lexbuf}
 
 | "break"
     {pp "break";BREAK}
 | "of"
-    {pp "of"; OF}
+    {pp "OF"; OF}
 | "end"
-    {pp "end"; END}
+    {pp "END"; END}
 | "in"
-    {pp "in"; IN}
+    {pp "IN"; IN}
 | "nil"
-    {pp "nil"; NIL}
+    {pp "NIL"; NIL}
 | "let"
-    {pp "let"; LET}
+    {pp "LET"; LET}
 | "do"
-    {pp "do"; DO}
+    {pp "DO"; DO}
 | "to"
-    {pp "to"; TO}
+    {pp "TO"; TO}
 | "for"
-    {pp "for"; FOR}
+    {pp "FOR"; FOR}
 | "while"
-    {pp "while"; WHILE}
+    {pp "WHILE"; WHILE}
 | "else"
-    {pp "else"; ELSE}
+    {pp "ELSE"; ELSE}
 | "then"
-    {pp "then"; THEN}
+    {pp "THEN"; THEN}
 | "array"
-    {pp "array"; ARRAY}
+    {pp "ARRAY"; ARRAY}
 
 | "type"
-    {pp "type"; TYPE}
+    {pp "TYPE"; TYPE}
 
 | alpha(alpha | digit | "_")* as id
-    {pp "id"; ID id}
+    {pp @@ "ID: " ^ id ; ID id}
 
 | digits as num
-    {pp "int"; INT (int_of_string num)}
+    {pp @@ "INT: " ^ num; INT (int_of_string num)}
 
 | ":="
-    {pp ":="; ASSIGN}
+    {pp "ASSIGN"; ASSIGN}
 
 | ","
-    {pp ","; COMMA}
+    {pp "COMMA"; COMMA}
 
 | "|"
-    {pp "|"; OR}
+    {pp "OR"; OR}
 
 | "&"
-    {pp "&"; AND}
+    {pp "AND"; AND}
 
 | ">="
-    {pp ">="; GE}
+    {pp "GE"; GE}
 
 | ">"
-    {pp ">"; GT}
+    {pp "GT"; GT}
 
 | "<="
-    {pp "<="; LE}
+    {pp "LE"; LE}
 
 | "<"
-    {pp "<"; LT}
+    {pp "LT"; LT}
 
 | "<>"
-    {pp "<>"; NEQ}
+    {pp "NEQ"; NEQ}
 
 | "="
-    {pp "="; EQ}
+    {pp "EQ"; EQ}
 
 | '*'
-    {pp "times"; TIMES}
+    {pp "TIMES"; TIMES}
 
 | '/'
-    {print_endline "divide"; DIVIDE}
+    {print_endline "DIVIDE"; DIVIDE}
 
 | "-"
-    {pp "-"; MINUS}
+    {pp "MINUS"; MINUS}
 
 | "+"
-    {pp "+"; PLUS}
+    {pp "PLUS"; PLUS}
 
 | "."
-    {pp "."; DOT}
+    {pp "DOT"; DOT}
 
 | "["
-    {pp "["; LBRACK}
+    {pp "LBRACK"; LBRACK}
 
 | "]"
-    {pp "]"; RBRACK}
+    {pp "RBRACK"; RBRACK}
 
 | "{"
-    {pp "{"; LBRACE}
+    {pp "LBRACE"; LBRACE}
 
 | "}"
-    {pp "}"; RBRACE}
+    {pp "RBRACE"; RBRACE}
 
 | "("
-    {pp "("; LPAREN}
+    {pp "LPAREN"; LPAREN}
 
 | ")"
-    {pp ")"; RPAREN}
+    {pp "RPAREN"; RPAREN}
 
 | ":"
-    {pp ":"; COLON}
+    {pp "COLON"; COLON}
 
 | ";"
-    {pp ";"; SEMICOLON}
+    {pp "SEMICOLON"; SEMICOLON}
 
 | eof
     (* Normal case: no data, eof. *)
-    {pp "eof"; EOF}
+    {pp "EOF"; EOF}
 | _
     { raise (Error (locate lexbuf; Printf.sprintf "At offset %d: unexpected character.\n" (Lexing.lexeme_start lexbuf) )) }
 
 and read_string buf = parse
-  | '"'       { (pp @@ Printf.sprintf "string: %s" (Buffer.contents buf)); STRING (Buffer.contents buf) }
+  | '"'       { (pp @@ Printf.sprintf "STRING: %s" (Buffer.contents buf)); STRING (Buffer.contents buf) }
   | '\\' '/'  { Buffer.add_char buf '/'; read_string buf lexbuf }
   | '\\' '\\' { Buffer.add_char buf '\\'; read_string buf lexbuf }
   | '\\' 'b'  { Buffer.add_char buf '\b'; read_string buf lexbuf }
@@ -182,11 +182,10 @@ and read_string buf = parse
 and comment = parse
 
 | "*/"
-    {pp "ending current comment";
-     comment_depth := !comment_depth - 1;
+    {comment_depth := !comment_depth - 1;
      if !comment_depth = 0 then (comment_active := false;token lexbuf )
      else (comment lexbuf)}
 | nl
-    {pp "comment newline"; next_line lexbuf; comment lexbuf}
+    {next_line lexbuf; comment lexbuf}
 | _
     {if !comment_active then comment lexbuf else token lexbuf}
