@@ -71,6 +71,15 @@ let () =
       "/home/bordo/tigml/test/test40.tig";
       "/home/bordo/tigml/test/test41.tig";
       "/home/bordo/tigml/test/test42.tig";
+      "/home/bordo/tigml/test/test43.tig";
+      "/home/bordo/tigml/test/test44.tig";
+      "/home/bordo/tigml/test/test45.tig";
+      "/home/bordo/tigml/test/test46.tig";
+      "/home/bordo/tigml/test/test47.tig";
+      "/home/bordo/tigml/test/test48.tig";
+      (* "/home/bordo/tigml/test/test49.tig";  this is supposed to syntax error*)
+      "/home/bordo/tigml/test/merge.tig";
+      "/home/bordo/tigml/test/queens.tig";
     ]
   in
   List.iter

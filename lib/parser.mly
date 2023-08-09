@@ -1,5 +1,5 @@
 %{
-	let debug = true
+	let debug = false
 	let pp = if debug then print_endline else (fun _->())
 %}
 
@@ -10,27 +10,41 @@
 %token LET IN END ARRAY IF THEN ELSE WHILE FOR TO DO OF 
 %token COMMA COLON SEMICOLON LPAREN RPAREN LBRACK RBRACK 
 %token LBRACE RBRACE DOT 
-%token PLUS MINUS UMINUS TIMES DIVIDE EQ NEQ LT LE GT GE
+%token PLUS MINUS TIMES DIVIDE EQ NEQ LT LE GT GE
 %token AND OR ASSIGN
 %token BREAK NIL
 %token FUNCTION VAR TYPE 
 
-%nonassoc SEMICOLON  // nonassociative for sequences of statements
-%right ASSIGN // right associative to enable variable chaining: a = b = c
-%left OR
-%left AND
-%nonassoc EQ NEQ // nonassociative, doesn't allow a == b == c
-%nonassoc LT LE GT GE // nonassociative, doesn't allow a < b < c
+
+
+%right SEMICOLON
+%left THEN
+%left DO OF ELSE
+%left ASSIGN
+%left AND OR
+%nonassoc EQ NEQ GT GE LT LE
 %left PLUS MINUS
 %left TIMES DIVIDE
-%right UMINUS  // right associative for unary minus: a = - - b
+%nonassoc TO
+%left UMINUS
 
-%nonassoc THEN
-%nonassoc ELSE  // Nonassociative ELSE for the 'dangling else' problem
 
-%nonassoc DO     // for the 'while' construct
-%nonassoc TO     // for the 'for' construct
-%nonassoc OF     // for the 'array of' construct
+(* %nonassoc SEMICOLON  // nonassociative for sequences of statements *)
+(* %right ASSIGN // right associative to enable variable chaining: a = b = c *)
+(* %left OR *)
+(* %left AND *)
+(* %nonassoc EQ NEQ // nonassociative, doesn't allow a == b == c *)
+(* %nonassoc LT LE GT GE // nonassociative, doesn't allow a < b < c *)
+(* %left PLUS MINUS *)
+(* %left TIMES DIVIDE *)
+(* %right UMINUS  // right associative for unary minus: a = - - b *)
+(**)
+(* %nonassoc THEN *)
+(* %nonassoc ELSE  // Nonassociative ELSE for the 'dangling else' problem *)
+(**)
+(* %nonassoc DO     // for the 'while' construct *)
+(* %nonassoc TO     // for the 'for' construct *)
+(* %nonassoc OF     // for the 'array of' construct *)
 
 %start <unit> main
 
@@ -51,14 +65,15 @@ exp :
 	| WHILE exp DO exp %prec DO {(pp "exp -> while")}
 	| lvalue_exp {(pp "exp -> lvalue_exp")}
 	| lvalue ASSIGN exp {(pp "exp -> assignment")}
-	| LPAREN optexp RPAREN {(pp "exp -> (optexp)")}
+	| LPAREN  RPAREN {(pp "exp -> ()")}
+	| LPAREN exp RPAREN {(pp "exp -> (optexp)")}
 	| exp SEMICOLON exp {(pp "exp -> exp;exp")}
 
 	| STRING {(pp "exp -> string")}
 	| INT {(pp "exp -> int")}
+  | MINUS exp %prec UMINUS {(pp "exp -> uminus")}
 	| ID {(pp "exp -> ID")}
 	| BREAK {(pp "exp -> Break")}
-	| UMINUS exp {(pp "exp -> uminus exp")}
 	| exp EQ exp {(pp "exp -> beq")}
 	| exp NEQ exp {(pp "exp -> bneq")}
 	| exp TIMES exp {(pp "exp -> btimes")}
@@ -75,10 +90,6 @@ exp :
 	| ID LBRACK exp RBRACK OF exp %prec OF {(pp "exp -> id[ex] of exp ")}
 	| ID LBRACE recordargs RBRACE {(pp "exp ->id{recordargs}")}
 	| ID LPAREN explist RPAREN {(pp "exp -> id(explist)")}
-
-
-
-	
 
 	| NIL {(pp "exp -> exp")}
 
