@@ -82,9 +82,10 @@ let () =
       "/home/bordo/tigml/test/merge.tig";
       "/home/bordo/tigml/test/queens.tig";
 	  "/home/bordo/tigml/test/ast1.tig";
+  	  "/home/bordo/tigml/test/ast2.tig";
+	  "/home/bordo/tigml/test/ast3.tig";
     *)
-
-	  "/home/bordo/tigml/test/ast2.tig";
+	  "/home/bordo/tigml/test/ast4.tig";
 
     ]
 
@@ -92,10 +93,10 @@ let () =
   List.iter
       (fun program ->
         printf "Lexing program %s\n" program;
-        let infile = open_in program in
-        let file_content = really_input_string infile (in_channel_length infile) in
-        let filebuf = Lexing.from_string file_content in
-        process filebuf;
+		let infile = open_in program in
+		let file_content = really_input_string infile (in_channel_length infile) in
+		let filebuf = Lexing.from_string file_content in
+		process filebuf;
         close_in infile;
         printf "\n")
       progs

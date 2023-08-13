@@ -57,8 +57,8 @@ main:
 
 exp : 
 	| LET decs IN optexp END {(pp "exp ->let in end"); LetExp {decs=$2; body=$4; pos=$startpos}}
-	| FOR ID ASSIGN exp TO exp DO exp %prec TO {(pp "exp -> for"); ForExp {var=$2; escape=ref false; lo=$4; hi=$6; body=$8; pos=$startpos}}
-  | IF exp THEN exp ELSE exp %prec ELSE {(pp "exp -> if then else"); IfExp {test=$2; then'=$4; else'=Some($6); pos=$startpos}}
+	| FOR ID ASSIGN exp TO exp DO exp %prec TO {(pp "exp -> for"); ForExp {var=$2; escape=ref true; lo=$4; hi=$6; body=$8; pos=$startpos}}
+	| IF exp THEN exp ELSE exp %prec ELSE {(pp "exp -> if then else"); IfExp {test=$2; then'=$4; else'=Some($6); pos=$startpos}}
 	| IF exp THEN exp %prec THEN {(pp "exp -> if then"); IfExp {test=$2; then'=$4; else'=None; pos=$startpos}}
 	| WHILE exp DO exp %prec DO {(pp "exp -> while"); WhileExp {test=$2; body=$4; pos=$startpos} }
 	| lvalue_exp {(pp "exp -> lvalue_exp"); VarExp $1}
@@ -132,8 +132,8 @@ ty :
 
 tyfields : 
 	| empty	{(pp "tyfields -> empty"); []}
-	| ID COLON ID COMMA tyfields	{(pp "tyfields -> with comma");{name=$1; escape=ref false; typ=$3; pos=$startpos} :: $5 }
-	| ID COLON ID 	{(pp "tyfields -> single"); {name=$1; escape=ref false; typ=$3; pos=$startpos} :: []}
+	| ID COLON ID COMMA tyfields	{(pp "tyfields -> with comma");{name=$1; escape=ref true; typ=$3; pos=$startpos} :: $5 }
+	| ID COLON ID 	{(pp "tyfields -> single"); {name=$1; escape=ref true; typ=$3; pos=$startpos} :: []}
 
 vardec :
 	| VAR ID ASSIGN exp	{(pp "vardec -> no type"); VarDec {name=$2; escape=ref true; typ=None; init=$4; pos=$startpos}}
