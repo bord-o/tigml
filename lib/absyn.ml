@@ -1,4 +1,4 @@
-type pos = int
+type pos = Lexing.position
 type symbol = string
 
 type oper = 

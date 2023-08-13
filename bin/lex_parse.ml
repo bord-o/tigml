@@ -80,8 +80,12 @@ let () =
       "/home/bordo/tigml/test/test48.tig";
       (* "/home/bordo/tigml/test/test49.tig";  this is supposed to syntax error*)
       "/home/bordo/tigml/test/merge.tig";
-    *)
       "/home/bordo/tigml/test/queens.tig";
+	  "/home/bordo/tigml/test/ast1.tig";
+    *)
+
+	  "/home/bordo/tigml/test/ast2.tig";
+
     ]
 
   in
