@@ -1,14 +1,4 @@
-ABSYN TYPES
-oper
-var
-exp
-field
-fundec
-typedec
-dec
-ty
-
-NONTERMINALS
-
-
-TERMINALS
+TODO: 
+	make module Semant
+		make transProg: Absyn.exp -> unit
+	make module Env

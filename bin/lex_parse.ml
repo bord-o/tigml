@@ -1,20 +1,20 @@
 open Tigml
+open Semant
 
 let absyn = ref []
+
 let process buf =
   try
     (* Run the parser on this line of input. *)
-     absyn :=  (Parser.main Lexer.token buf):: !absyn; 
-    (*
+    absyn := Parser.main Lexer.token buf :: !absyn;
+	Semant.transProg absyn
+  with
+  (*
     ignore (Lexer.token buf);
     process buf
     *)
-  with
-  | Parser.Error ->
-      raise Parser.Error
-
-  | Lexer.Error msg ->
-    print_endline msg
+  | Parser.Error -> raise Parser.Error
+  | Lexer.Error msg -> print_endline msg
 
 let () =
   (* let infile = open_in "/home/bordo/tigml/test/calc.calc" in*)
@@ -28,7 +28,7 @@ let () =
 
   let progs =
     [
-    (*
+      (*
       "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test2.tig";
       "/home/bordo/tigml/test/test3.tig";
@@ -85,18 +85,19 @@ let () =
   	  "/home/bordo/tigml/test/ast2.tig";
 	  "/home/bordo/tigml/test/ast3.tig";
     *)
-	  "/home/bordo/tigml/test/ast4.tig";
-
+      "/home/bordo/tigml/test/ast4.tig";
     ]
-
   in
+
   List.iter
-      (fun program ->
-        printf "Lexing program %s\n" program;
-		let infile = open_in program in
-		let file_content = really_input_string infile (in_channel_length infile) in
-		let filebuf = Lexing.from_string file_content in
-		process filebuf;
-        close_in infile;
-        printf "\n")
-      progs
+    (fun program ->
+      printf "Lexing program %s\n" program;
+      let infile = open_in program in
+      let file_content =
+        really_input_string infile (in_channel_length infile)
+      in
+      let filebuf = Lexing.from_string file_content in
+      process filebuf;
+      close_in infile;
+      printf "\n")
+    progs

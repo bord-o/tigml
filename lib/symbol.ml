@@ -1,42 +1,47 @@
-module type SYMBOL =
-sig
+module type SYMBOL = sig
   type symbol
+
   val symbol : string -> symbol
   val name : symbol -> string
+
   type 'a table
+
   val empty : 'a table
   val enter : 'a table * symbol * 'a -> 'a table
-  val look  : 'a table * symbol -> 'a option
+  val look : 'a table * symbol -> 'a option
 end
 
-module Symbol : SYMBOL =
+module Symbol : SYMBOL = struct
+  type symbol = string * int
 
-struct
+  module H = Hashtbl
 
-	type symbol = string * int
+  exception Symbol
 
-	module H = Hashtbl
+  let nextsym = ref 0
+  let sizeHint = 128
+  let hashtable : (string, int) H.t = H.create sizeHint
 
-	exception Symbol
-	let nextsym = ref 0 
-	let sizeHint = 128
+  let symbol name =
+    match H.find_opt hashtable name with
+    | Some i -> (name, i)
+    | None ->
+        let i = !nextsym in
+        nextsym := i + 1;
+        H.add hashtable name i;
+        (name, i)
 
-	let hashtable : (string, int) H.t = H.create sizeHint
-	let symbol name =
-	  match H.find_opt hashtable name
-	   with Some i -> (name,i)
-	    | None -> let i = !nextsym
-	           in nextsym := i+1;
-					H.add hashtable name i;
-		      (name,i)
+  let name (s, _) = s
 
-	let name (s,_) = s
+  module Table = Map.Make (struct
+    type t = symbol
 
-	module Table = Map.Make(struct type t = symbol let compare (_,x) (_, y) = Stdlib.compare x y end)
+    let compare (_, x) (_, y) = Stdlib.compare x y
+  end)
 
-	type 'a table= 'a Table.t
-	let empty = Table.empty 
-	let enter (t, k, v) = Table.add k v t
-	let look (t, k) = Table.find_opt k t
+  type 'a table = 'a Table.t
+
+  let empty = Table.empty
+  let enter (t, k, v) = Table.add k v t
+  let look (t, k) = Table.find_opt k t
 end
-
