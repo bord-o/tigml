@@ -13,15 +13,13 @@ module type ENV = sig
 end
 
 module Env : ENV = struct
-	type access = unit
-	type ty = Types.ty
+  type access = unit
+  type ty = Types.ty
 
-	type enventry =
-		| VarEntry of { ty : ty }
-		| FunEntry of { formals : ty list; result : ty }
-	
-	let base_tenv = Symbol.empty
-	let base_venv = Symbol.empty
+  type enventry =
+    | VarEntry of { ty : ty }
+    | FunEntry of { formals : ty list; result : ty }
 
-
+  let base_tenv = Symbol.empty
+  let base_venv = Symbol.empty
 end

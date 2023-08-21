@@ -3,7 +3,7 @@
   open Lexing
 
   exception Error of string
-  let debug = true
+  let debug = false
   let pp = if debug then print_endline else (fun _ -> ())
 
   let comment_depth = ref 0

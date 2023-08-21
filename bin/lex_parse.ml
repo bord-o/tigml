@@ -1,13 +1,12 @@
 open Tigml
 open Semant
 
-let absyn = ref []
-
 let process buf =
   try
     (* Run the parser on this line of input. *)
-    absyn := Parser.main Lexer.token buf :: !absyn;
-	Semant.transProg absyn
+    let absyn = Parser.main Lexer.token buf in
+    Absyn.print_exp absyn 0;
+    Semant.transProg absyn
   with
   (*
     ignore (Lexer.token buf);
@@ -84,8 +83,10 @@ let () =
 	  "/home/bordo/tigml/test/ast1.tig";
   	  "/home/bordo/tigml/test/ast2.tig";
 	  "/home/bordo/tigml/test/ast3.tig";
-    *)
       "/home/bordo/tigml/test/ast4.tig";
+      "/home/bordo/tigml/test/ast5.tig";
+    *)
+      "/home/bordo/tigml/test/queens.tig";
     ]
   in
 
