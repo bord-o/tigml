@@ -86,7 +86,7 @@ let () =
       "/home/bordo/tigml/test/ast4.tig";
       "/home/bordo/tigml/test/ast5.tig";
     *)
-      "/home/bordo/tigml/test/queens.tig";
+      "/home/bordo/tigml/test/ast5.tig";
     ]
   in
 
