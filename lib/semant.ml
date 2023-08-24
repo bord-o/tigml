@@ -32,6 +32,7 @@ module Semant : SEMANT = struct
   exception UnexpectedType of int
   exception UnboundIdentifier of int
   exception IncorrectNumberOfArguments of int
+  exception IncorrectNumberOfFields of int
 
   (* basic type checking function *)
   let check_type (e : expty) (expected : Types.ty) (p : A.pos) =
@@ -135,18 +136,48 @@ module Semant : SEMANT = struct
               raise @@ UnboundIdentifier pos.pos_lnum
           | None -> raise @@ UnboundIdentifier pos.pos_lnum
           | Some (FunEntry { formals; result }) ->
-              (if List.length formals <> List.length arg_tys then raise @@ IncorrectNumberOfArguments pos.pos_lnum else ());
+              if List.length formals <> List.length arg_tys then
+                raise @@ IncorrectNumberOfArguments pos.pos_lnum
+              else ();
               List.iter2
                 (fun left_type right_type ->
                   if left_type <> right_type then
                     raise @@ UnexpectedType pos.pos_lnum
                   else ())
                 formals arg_tys;
-            result
+              result
         in
         { exp = (); ty = f_return_type }
+    | A.RecordExp { fields; typ; pos } ->
+        let checked_fields = [] in
+        let record_type : ty =
+          match S.look (tys, S.symbol typ) with
+          | Some t -> t
+          | None -> raise @@ UnboundIdentifier pos.pos_lnum
+        in
+        (match record_type with
+        | RECORD (type_fields, _) ->
+            if List.length fields <> List.length type_fields then
+              raise @@ IncorrectNumberOfFields pos.pos_lnum
+            else ();
+            (* iterate through the type definitions fields and types,
+               and make sure that both the name and type of each field
+               correspond to thos in the expression IN ORDER!!! (easier) *)
+            List.iter2
+              (fun (lsym, ltype) (rsym, rtype, _) ->
+                if lsym <> S.symbol rsym then (
+                  Printf.printf "Expected %s" @@ S.name lsym;
+                  raise @@ UnboundIdentifier pos.pos_lnum)
+                else ();
+                check_type (trexp rtype) ltype pos)
+              type_fields fields
+        | other ->
+            Printf.printf "Expected %s but found %s" "RECORD"
+              (string_of_type other);
+            raise @@ UnexpectedType pos.pos_lnum);
 
-    | A.RecordExp { fields; typ; pos } -> { exp = (); ty = UNIT }
+        { exp = (); ty = RECORD (checked_fields, ref ()) }
+        (* so this returns a record type of (symbol * ty) list * unique *)
     | A.SeqExp exps -> { exp = (); ty = UNIT }
     | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
     | A.IfExp { test; then'; else'; pos } -> { exp = (); ty = UNIT }
@@ -176,4 +207,7 @@ module Semant : SEMANT = struct
 
   (* ignore the result to just type check *)
   let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv e
+  (* TODO: refactor to let me pass in test environments 
+    in order to unit test some of my type checking 
+    before getting to declarations *)
 end
