@@ -1,6 +1,6 @@
 run:
 	dune exec tigml --profile=release
-all:	
+build:	
 	dune build . --profile=release
 clean:
 	dune clean
