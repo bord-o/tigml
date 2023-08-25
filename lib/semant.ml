@@ -178,12 +178,45 @@ module Semant : SEMANT = struct
 
         { exp = (); ty = RECORD (checked_fields, ref ()) }
         (* so this returns a record type of (symbol * ty) list * unique *)
-    | A.SeqExp exps -> { exp = (); ty = UNIT }
-    | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
-    | A.IfExp { test; then'; else'; pos } -> { exp = (); ty = UNIT }
-    | A.WhileExp { test; body; pos } -> { exp = (); ty = UNIT }
+    | A.SeqExp exps ->
+        (* you could force unit for all seq like last like in ocaml,
+           but the language doesnt explicitly say that, so i will just ignore them *)
+        let exp, pos = List.(rev exps |> hd) in
+        trexp exp
+    | A.IfExp { test; then'; else'; pos } -> (
+        let then_type = (trexp then').ty in
+
+        match else' with
+        | None -> (
+            match then_type with
+            | INT -> { exp = (); ty = then_type }
+            | _ ->
+                Printf.printf "test should be an integer expression";
+                raise @@ UnexpectedType pos.pos_lnum)
+        | Some e ->
+            let else_type = (trexp e).ty in
+
+            let _ =
+              if then_type <> else_type then (
+                Printf.printf "Expected %s but got %s"
+                  (string_of_type then_type) (string_of_type else_type);
+                raise @@ UnexpectedType pos.pos_lnum)
+              else ()
+            in
+            { exp = (); ty = then_type })
+    | A.BreakExp _ -> { exp = (); ty = UNIT}
+    | A.WhileExp { test; body; pos } ->
+        (match (trexp test).ty with
+        | INT -> ()
+        | _ ->
+            Printf.printf "test should be an integer expression";
+            raise @@ UnexpectedType pos.pos_lnum);
+        { exp = (); ty = (trexp body).ty }
+
     | A.ForExp { var; escape; lo; hi; body; pos } -> { exp = (); ty = UNIT }
-    | A.BreakExp _ -> { exp = (); ty = UNIT }
+
+
+    | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
     | A.LetExp { decs; body; pos } -> { exp = (); ty = UNIT }
     | A.ArrayExp { typ; size; init; pos } -> { exp = (); ty = UNIT }
 
@@ -207,7 +240,7 @@ module Semant : SEMANT = struct
 
   (* ignore the result to just type check *)
   let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv e
-  (* TODO: refactor to let me pass in test environments 
-    in order to unit test some of my type checking 
-    before getting to declarations *)
+  (* TODO: refactor to let me pass in test environments
+     in order to unit test some of my type checking
+     before getting to declarations *)
 end
