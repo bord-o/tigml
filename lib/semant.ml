@@ -99,30 +99,10 @@ module Semant : SEMANT = struct
     | A.NilExp -> { exp = (); ty = NIL }
     | A.IntExp value -> { exp = (); ty = INT }
     | A.StringExp (value, _) -> { exp = (); ty = STRING }
-    | A.VarExp (A.SimpleVar (sym, pos)) ->
-        let t1 =
-          match Symbol.look (vars, S.symbol sym) with
-          | Some (E.VarEntry { ty = t }) -> t
-          | Some (E.FunEntry _) ->
-              print_endline "Expected a var, found a function";
-              raise @@ UnboundIdentifier pos.pos_lnum
-          | None -> raise @@ UnboundIdentifier pos.pos_lnum
-        in
-        { exp = (); ty = t1 }
-    (*has a var, should be handled by the other function *)
-    (* var.sym *)
-    | A.VarExp (A.FieldVar (var, sym, _)) ->
-        let record = trvar var in
-        (* TODO: this is perplexing to me, because of nested fields/arrays, need to come back *)
-        { exp = (); ty = UNIT }
-    (* the var in this needs to be resolved to a record type to pass *)
-    (* essentially we seperately check that var is a record, and then return the type of sym as a field of that record*)
-    (* var[exp]*)
-    | A.VarExp (A.SubscriptVar (var, exp, _)) ->
-        let array = trvar var in
-        { exp = (); ty = UNIT }
-        (* the var in this needs to be resolved to an array type to ass*)
+    (* variable expressions can just use the other function *)
+    | A.VarExp v -> trvar v
     | A.CallExp { func; args; pos } ->
+        (* is this checking if the function is in the env?*)
         let arg_tys =
           List.map
             (fun arg_exp -> match trexp arg_exp with { exp; ty } -> ty)
@@ -212,15 +192,57 @@ module Semant : SEMANT = struct
             raise @@ UnexpectedType pos.pos_lnum);
         { exp = (); ty = (trexp body).ty }
     | A.ForExp { var; escape; lo; hi; body; pos } -> { exp = (); ty = UNIT }
+    (* hande the var with recursion, make sure it is an int, make sure
+       lo and high are ints, return body type*)
     | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
-    | A.LetExp { decs; body; pos } -> { exp = (); ty = UNIT }
+    (* hande the var with recursion, make sure it is the same type as
+       the expression return that type *)
+    | A.LetExp { decs; body; pos } ->
+        (* add to env *)
+        let creat_env entry = transDec vars tys entry in
+        let { venv = new_venv; tenv = new_tenv } =
+          List.fold_left
+            (fun acc dec -> transDec vars tys dec)
+            { venv = vars; tenv = tys }
+            decs
+        in
+        let body_type = transExp new_venv new_tenv body in
+
+        { exp = (); ty = body_type.ty }
+    (* recursively handle the delarations to build the environment,
+       then evaluate the body, returning its type *)
     | A.ArrayExp { typ; size; init; pos } -> { exp = (); ty = UNIT }
+  (*  *)
 
   and transVar vars tys (var : A.var) =
+    let trexp = transExp vars tys in
+    let trvar = transVar vars tys in
+
     match var with
-    | A.SimpleVar (_, _) -> { exp = (); ty = UNIT }
-    | A.FieldVar (_, _, _) -> { exp = (); ty = UNIT }
-    | A.SubscriptVar (_, _, _) -> { exp = (); ty = UNIT }
+    (* 
+     *)
+    | A.SimpleVar (sym, pos) ->
+        let t1 =
+          match Symbol.look (vars, S.symbol sym) with
+          | Some (E.VarEntry { ty = t }) -> t
+          | Some (E.FunEntry _) ->
+              print_endline "Expected a var, found a function";
+              raise @@ UnboundIdentifier pos.pos_lnum
+          | None -> raise @@ UnboundIdentifier pos.pos_lnum
+        in
+        { exp = (); ty = t1 }
+    (* var.sym *)
+    | A.FieldVar (var, sym, _) ->
+        let record = trvar var in
+        (* TODO: this is perplexing to me, because of nested fields/arrays, need to come back *)
+        { exp = (); ty = UNIT }
+    (* the var in this needs to be resolved to a record type to pass *)
+    (* essentially we seperately check that var is a record, and then return the type of sym as a field of that record*)
+    (* var[exp]*)
+    | A.SubscriptVar (var, exp, _) ->
+        let array = trvar var in
+        { exp = (); ty = UNIT }
+  (* the var in this needs to be resolved to an array type to ass*)
 
   and transDec vars tys (dec : A.dec) =
     match dec with

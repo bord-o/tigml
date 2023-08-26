@@ -2,12 +2,9 @@
 
 /* (nil; 5/3; func (6/9, 900)) */
 
-/*
 let
 	var x := 5
 in
 	func (a, b, c)
 end
-*/
 
-test.test.finalval
