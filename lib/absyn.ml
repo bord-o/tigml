@@ -1,6 +1,6 @@
 open List
 
-    type pos = Lexing.position
+type pos = Lexing.position
 type symbol = string
 
 type oper =

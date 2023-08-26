@@ -109,18 +109,17 @@ module Semant : SEMANT = struct
           | None -> raise @@ UnboundIdentifier pos.pos_lnum
         in
         { exp = (); ty = t1 }
+    (*has a var, should be handled by the other function *)
+    (* var.sym *)
     | A.VarExp (A.FieldVar (var, sym, _)) ->
-        let record =
-          match var with
-          | A.SimpleVar (_, _) -> ()
-          | A.FieldVar (_, _, _) -> ()
-          | A.SubscriptVar (_, _, _) -> ()
-        in
+        let record = trvar var in
         (* TODO: this is perplexing to me, because of nested fields/arrays, need to come back *)
         { exp = (); ty = UNIT }
     (* the var in this needs to be resolved to a record type to pass *)
     (* essentially we seperately check that var is a record, and then return the type of sym as a field of that record*)
+    (* var[exp]*)
     | A.VarExp (A.SubscriptVar (var, exp, _)) ->
+        let array = trvar var in
         { exp = (); ty = UNIT }
         (* the var in this needs to be resolved to an array type to ass*)
     | A.CallExp { func; args; pos } ->
@@ -204,7 +203,7 @@ module Semant : SEMANT = struct
               else ()
             in
             { exp = (); ty = then_type })
-    | A.BreakExp _ -> { exp = (); ty = UNIT}
+    | A.BreakExp _ -> { exp = (); ty = UNIT }
     | A.WhileExp { test; body; pos } ->
         (match (trexp test).ty with
         | INT -> ()
@@ -212,10 +211,7 @@ module Semant : SEMANT = struct
             Printf.printf "test should be an integer expression";
             raise @@ UnexpectedType pos.pos_lnum);
         { exp = (); ty = (trexp body).ty }
-
     | A.ForExp { var; escape; lo; hi; body; pos } -> { exp = (); ty = UNIT }
-
-
     | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
     | A.LetExp { decs; body; pos } -> { exp = (); ty = UNIT }
     | A.ArrayExp { typ; size; init; pos } -> { exp = (); ty = UNIT }
