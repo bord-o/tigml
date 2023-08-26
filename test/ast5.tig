@@ -5,6 +5,7 @@
 let
 	var x := 5
 in
-	func (a, b, c)
-end
+	func (a, b, c);
+	5+5
 
+end

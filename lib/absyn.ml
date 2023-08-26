@@ -72,6 +72,7 @@ and ty =
   | RecordTy of field list
   | ArrayTy of symbol * pos
 
+(*
 let rec pad s i = if i = 0 then s else pad ("  " ^ s) (i - 1)
 
 let rec print_var (var : var) (indent : int) =
@@ -189,3 +190,4 @@ and print_exp (expression : exp) (indent : int) =
       print_exp hi (indent + 1);
       print_exp body (indent + 1)
 (* TODO: Make all of these print functions coherent. Need to adjust ordering and finish declaration functions *)
+*)

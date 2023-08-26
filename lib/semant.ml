@@ -251,10 +251,20 @@ module Semant : SEMANT = struct
     | A.TypeDec _ -> { venv = vars; tenv = tys }
 
   and transTy tenv (typ : A.ty) =
+    (* TODO: figure out the actual type function and where it should be used*)
     match typ with
-    | A.NameTy (_, _) -> UNIT
-    | A.RecordTy _ -> UNIT
-    | A.ArrayTy (_, _) -> UNIT
+    | A.NameTy (s, pos) -> (
+        match S.look (tenv, S.symbol s) with
+        | Some t -> t
+        | None -> raise @@ UnboundIdentifier pos.pos_lnum)
+    | A.ArrayTy (s, pos) -> (
+        match S.look (tenv, S.symbol s) with
+        | Some t -> t
+        | None -> raise @@ UnboundIdentifier pos.pos_lnum)
+    | A.RecordTy fields -> (
+      let check_field (f: A.field) =  
+      UNIT in UNIT 
+    )
 
   (* ignore the result to just type check *)
   let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv e
