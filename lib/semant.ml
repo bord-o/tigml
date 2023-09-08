@@ -36,18 +36,11 @@ module Semant : SEMANT = struct
 
   (* basic type checking function *)
   let check_type (e : expty) (expected : Types.ty) (p : A.pos) =
-    match e.ty with
-    | INT when expected = INT -> ()
-    | STRING when expected = STRING -> ()
-    | NIL when expected = NIL -> ()
-    | RECORD (a, b) when expected = RECORD (a, b) -> ()
-    | ARRAY (a, b) when expected = ARRAY (a, b) -> ()
-    | NAME (a, b) when expected = NAME (a, b) -> ()
-    | UNIT when expected = UNIT -> ()
-    | t ->
-        Printf.printf "Expected %s, but found %s\n" (string_of_type expected)
-          (string_of_type t);
-        raise @@ UnexpectedType p.pos_lnum
+    if e.ty = expected then ()
+    else (
+      Printf.printf "Expected %s, but found %s\n" (string_of_type expected)
+        (string_of_type e.ty);
+      raise @@ UnexpectedType p.pos_lnum)
 
   let rec transExp vars tys (exp : A.exp) =
     let trexp = transExp vars tys in
@@ -164,42 +157,55 @@ module Semant : SEMANT = struct
         trexp exp
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
-
+        let () = check_type (trexp test) INT pos in
         match else' with
-        | None -> (
-            match then_type with
-            | INT -> { exp = (); ty = then_type }
-            | _ ->
-                Printf.printf "test should be an integer expression";
-                raise @@ UnexpectedType pos.pos_lnum)
-        | Some e ->
-            let else_type = (trexp e).ty in
-
-            let _ =
-              if then_type <> else_type then (
-                Printf.printf "Expected %s but got %s"
-                  (string_of_type then_type) (string_of_type else_type);
-                raise @@ UnexpectedType pos.pos_lnum)
-              else ()
-            in
+        | None -> { exp = (); ty = then_type }
+        | Some else' ->
+            check_type (trexp else') then_type pos;
             { exp = (); ty = then_type })
     | A.BreakExp _ -> { exp = (); ty = UNIT }
     | A.WhileExp { test; body; pos } ->
-        (match (trexp test).ty with
-        | INT -> ()
-        | _ ->
-            Printf.printf "test should be an integer expression";
-            raise @@ UnexpectedType pos.pos_lnum);
-        { exp = (); ty = (trexp body).ty }
-    | A.ForExp { var; escape; lo; hi; body; pos } -> { exp = (); ty = UNIT }
-    (* hande the var with recursion, make sure it is an int, make sure
-       lo and high are ints, return body type*)
-    | A.AssignExp { var; exp; pos } -> { exp = (); ty = UNIT }
-    (* hande the var with recursion, make sure it is the same type as
-       the expression return that type *)
+        check_type (trexp test) INT pos;
+        check_type (trexp body) UNIT pos;
+        { exp = (); ty = UNIT }
+        (* hande the var with recursion, make sure it is an int, make sure
+           lo and high are ints, return body type*)
+    | A.ForExp { var; escape; lo; hi; body; pos } ->
+        (* TODO: make this function work *)
+        let contains_assignment_to _ _ = false in
+
+        (* Check that 'lo' and 'hi' expressions are of type INT *)
+        check_type (trexp lo) INT pos;
+        check_type (trexp hi) INT pos;
+
+        (* Temporarily introduce 'var' into the environment with type INT.
+           This shadows any outer variable with the same name. *)
+        let new_vars_env =
+          S.enter (vars, S.symbol var, VarEntry { ty = INT })
+        in
+
+        (* Check the body of the loop using the new environment.
+           We expect it to be of type UNIT *)
+        let body_checked = transExp new_vars_env tys body in
+        check_type body_checked UNIT pos;
+
+        (* Ensure that 'var' is not assigned to in 'body'.
+           For this purpose, I'm writing a function 'contains_assignment_to'.
+           The implementation of this function can be complex depending on the complexity
+           of your language. We will write a stub for it now. *)
+        (* This is a stub for the 'contains_assignment_to' function.
+           You'd need to implement it fully. *)
+        if contains_assignment_to body var then failwith "forbiddent assignment";
+
+        (* Return type of the ForExp is UNIT *)
+        { exp = (); ty = UNIT }
+    | A.AssignExp { var; exp; pos } ->
+        (* hande the var with recursion, make sure it is the same type as
+           the expression return that type *)
+        check_type (trvar var) (trexp exp).ty pos;
+        { exp = (); ty = UNIT }
     | A.LetExp { decs; body; pos } ->
         (* add to env *)
-        let creat_env entry = transDec vars tys entry in
         let { venv = new_venv; tenv = new_tenv } =
           List.fold_left
             (fun acc dec -> transDec vars tys dec)
@@ -211,16 +217,27 @@ module Semant : SEMANT = struct
         { exp = (); ty = body_type.ty }
     (* recursively handle the delarations to build the environment,
        then evaluate the body, returning its type *)
-    | A.ArrayExp { typ; size; init; pos } -> { exp = (); ty = UNIT }
-  (*  *)
+    | A.ArrayExp { typ; size; init; pos } ->
+        (* Ensure typ is an array type *)
+        let array_type =
+          match S.look (tys, S.symbol typ) with
+          | Some (Types.ARRAY (t, _)) -> t
+          | _ ->
+              Printf.printf "Type %s is not an array type\n" typ;
+              raise @@ UnexpectedType pos.pos_lnum
+        in
+        (* Ensure size is an integer *)
+        check_type (transExp vars tys size) INT pos;
+        (* Ensure init type matches the base type of the array *)
+        check_type (transExp vars tys init) array_type pos;
+
+        { exp = (); ty = Types.ARRAY (array_type, ref ()) }
 
   and transVar vars tys (var : A.var) =
     let trexp = transExp vars tys in
     let trvar = transVar vars tys in
 
     match var with
-    (* 
-     *)
     | A.SimpleVar (sym, pos) ->
         let t1 =
           match Symbol.look (vars, S.symbol sym) with
@@ -231,24 +248,96 @@ module Semant : SEMANT = struct
           | None -> raise @@ UnboundIdentifier pos.pos_lnum
         in
         { exp = (); ty = t1 }
-    (* var.sym *)
-    | A.FieldVar (var, sym, _) ->
-        let record = trvar var in
-        (* TODO: this is perplexing to me, because of nested fields/arrays, need to come back *)
-        { exp = (); ty = UNIT }
-    (* the var in this needs to be resolved to a record type to pass *)
-    (* essentially we seperately check that var is a record, and then return the type of sym as a field of that record*)
-    (* var[exp]*)
-    | A.SubscriptVar (var, exp, _) ->
-        let array = trvar var in
-        { exp = (); ty = UNIT }
-  (* the var in this needs to be resolved to an array type to ass*)
+    | A.FieldVar (var, sym, pos) -> (
+        let record_type = trvar var in
+        match record_type.ty with
+        | RECORD (fields, _) -> (
+            match List.assoc_opt (S.symbol sym) fields with
+            | Some fieldType -> { exp = (); ty = fieldType }
+            | None ->
+                print_endline "Field not found in the record type";
+                raise @@ UnexpectedType pos.pos_lnum)
+        | _ ->
+            print_endline "Expected a record type";
+            raise @@ UnexpectedType pos.pos_lnum)
+    | A.SubscriptVar (var, exp, pos) -> (
+        let array_type = trvar var in
+        let index_type = trexp exp in
+        match (array_type.ty, index_type.ty) with
+        | ARRAY (elementType, _), INT -> { exp = (); ty = elementType }
+        | _, _ ->
+            print_endline "Array type or index type mismatch";
+            raise @@ UnexpectedType pos.pos_lnum)
 
   and transDec vars tys (dec : A.dec) =
     match dec with
-    | A.FunctionDec _ -> { venv = vars; tenv = tys }
-    | A.VarDec _ -> { venv = vars; tenv = tys }
-    | A.TypeDec _ -> { venv = vars; tenv = tys }
+    | A.FunctionDec funDecList ->
+        let new_venv =
+          List.fold_left
+            (fun venv (fundec : A.fundec) ->
+              let name = fundec.A.name in
+              let params = fundec.A.params in
+              let result = fundec.A.result in
+              let body = fundec.A.body in
+              let pos = fundec.A.pos in
+
+              (* Determine formal parameter types from 'params' *)
+              let formals =
+                List.map
+                  (fun { A.name = n; A.typ = ty_name; _ } ->
+                    match S.look (tys, S.symbol ty_name) with
+                    | Some internal_ty -> internal_ty
+                    | None -> raise @@ UnboundIdentifier fundec.A.pos.pos_lnum)
+                    (* Used fundec's pos since individual field's pos is not available *)
+                  (params : A.field list)
+              in
+
+              (* Determine the result type from 'result' *)
+              let result_type =
+                match result with
+                | Some (ty_name, ty_pos) -> (
+                    match S.look (tys, S.symbol ty_name) with
+                    | Some internal_ty -> internal_ty
+                    | None -> raise @@ UnboundIdentifier ty_pos.pos_lnum)
+                | None -> UNIT
+              in
+
+              (* Update venv with function details *)
+              S.enter
+                ( venv,
+                  S.symbol name,
+                  E.FunEntry { formals; result = result_type } ))
+            vars funDecList
+        in
+
+        { venv = new_venv; tenv = tys }
+    | A.VarDec varDec ->
+        let init_type = (transExp vars tys varDec.init).ty in
+        let var_type =
+          match varDec.typ with
+          | Some (ty_name, ty_pos) -> (
+              match S.look (tys, S.symbol ty_name) with
+              | Some t -> t
+              | None -> raise @@ UnboundIdentifier ty_pos.pos_lnum)
+          | None -> init_type
+        in
+        if var_type <> init_type then
+          raise @@ UnexpectedType varDec.pos.pos_lnum;
+        let new_venv =
+          S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
+        in
+        { venv = new_venv; tenv = tys }
+    | A.TypeDec typeDecList ->
+        let new_tenv =
+          List.fold_left
+            (fun tenv typedec ->
+              let name = typedec.A.name in
+              let ty = typedec.A.ty in
+              let internal_ty = transTy tenv ty in
+              S.enter (tenv, S.symbol name, internal_ty))
+            tys typeDecList
+        in
+        { venv = vars; tenv = new_tenv }
 
   and transTy tenv (typ : A.ty) =
     (* TODO: figure out the actual type function and where it should be used*)
@@ -261,10 +350,14 @@ module Semant : SEMANT = struct
         match S.look (tenv, S.symbol s) with
         | Some t -> t
         | None -> raise @@ UnboundIdentifier pos.pos_lnum)
-    | A.RecordTy fields -> (
-      let check_field (f: A.field) =  
-      UNIT in UNIT 
-    )
+    | A.RecordTy fields ->
+        let trans_field (f : A.field) =
+          match S.look (tenv, S.symbol f.typ) with
+          | Some t -> (S.symbol f.name, t)
+          | None -> raise @@ UnboundIdentifier f.pos.pos_lnum
+        in
+        let internal_fields = List.map trans_field fields in
+        RECORD (internal_fields, ref ())
 
   (* ignore the result to just type check *)
   let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv e
