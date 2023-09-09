@@ -45,7 +45,10 @@ module Semant : SEMANT = struct
   let rec transExp vars tys (exp : A.exp) =
     let trexp = transExp vars tys in
     let trvar = transVar vars tys in
-    let actual_ty t = () in
+    let rec actual_ty = function
+      | NAME (_, { contents = Some real_type }) -> actual_ty real_type
+      | t -> t
+    in
 
     match exp with
     (* for operation expressions we just type check the left and right TODO: do all of these return int? *)
