@@ -43,15 +43,17 @@ module Semant : SEMANT = struct
       raise @@ UnexpectedType p.pos_lnum)
 
   let rec transExp vars tys (exp : A.exp) =
+    (* define wrappers for brevity *)
     let trexp = transExp vars tys in
     let trvar = transVar vars tys in
+    (* define function to find the concrete type of a type *)
     let rec actual_ty = function
       | NAME (_, { contents = Some real_type }) -> actual_ty real_type
       | t -> t
     in
 
     match exp with
-    (* for operation expressions we just type check the left and right TODO: do all of these return int? *)
+    (* for operation expressions we just type check the left and right *)
     | A.OpExp { left; oper = A.PlusOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
@@ -92,11 +94,13 @@ module Semant : SEMANT = struct
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
         { exp = (); ty = INT }
+    (* our concrete expressions return their types *)
     | A.NilExp -> { exp = (); ty = NIL }
     | A.IntExp value -> { exp = (); ty = INT }
     | A.StringExp (value, _) -> { exp = (); ty = STRING }
     (* variable expressions can just use the other function *)
     | A.VarExp v -> trvar v
+    (* call expressions type check expected arg count and types, and returns the return type of the callee *)
     | A.CallExp { func; args; pos } ->
         (* is this checking if the function is in the env?*)
         let arg_tys =
@@ -123,6 +127,7 @@ module Semant : SEMANT = struct
               result
         in
         { exp = (); ty = f_return_type }
+    (* ccheck record field count and types like a function call *)
     | A.RecordExp { fields; typ; pos } ->
         let checked_fields = [] in
         let record_type : ty =
@@ -152,12 +157,13 @@ module Semant : SEMANT = struct
             raise @@ UnexpectedType pos.pos_lnum);
 
         { exp = (); ty = RECORD (checked_fields, ref ()) }
-        (* so this returns a record type of (symbol * ty) list * unique *)
+    (* to check a seq we just make sure the last is a unit type, everything prior is ignored *)
     | A.SeqExp exps ->
         (* you could force unit for all seq like last like in ocaml,
            but the language doesnt explicitly say that, so i will just ignore them *)
         let exp, pos = List.(rev exps |> hd) in
         trexp exp
+    (* to check if, we make sure test is int, then we return the type of the executed branch depending on if the else exists *)
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
         let () = check_type (trexp test) INT pos in
@@ -166,13 +172,15 @@ module Semant : SEMANT = struct
         | Some else' ->
             check_type (trexp else') then_type pos;
             { exp = (); ty = then_type })
+    (* just unit for now *)
     | A.BreakExp _ -> { exp = (); ty = UNIT }
+    (* just check that the test is int and body is unit*)
     | A.WhileExp { test; body; pos } ->
         check_type (trexp test) INT pos;
         check_type (trexp body) UNIT pos;
         { exp = (); ty = UNIT }
-        (* hande the var with recursion, make sure it is an int, make sure
-           lo and high are ints, return body type*)
+    (* hande the var with recursion, make sure it is an int, make sure
+       lo and high are ints, return body type*)
     | A.ForExp { var; escape; lo; hi; body; pos } ->
         (* TODO: make this function work *)
         let contains_assignment_to _ _ = false in
@@ -192,21 +200,17 @@ module Semant : SEMANT = struct
         let body_checked = transExp new_vars_env tys body in
         check_type body_checked UNIT pos;
 
-        (* Ensure that 'var' is not assigned to in 'body'.
-           For this purpose, I'm writing a function 'contains_assignment_to'.
-           The implementation of this function can be complex depending on the complexity
-           of your language. We will write a stub for it now. *)
-        (* This is a stub for the 'contains_assignment_to' function.
-           You'd need to implement it fully. *)
+        (* Ensure that 'var' is not assigned to in 'body'.*)
         if contains_assignment_to body var then failwith "forbiddent assignment";
 
         (* Return type of the ForExp is UNIT *)
         { exp = (); ty = UNIT }
+    (* hande the var with recursion, make sure it is the same type as
+       the expression return that type *)
     | A.AssignExp { var; exp; pos } ->
-        (* hande the var with recursion, make sure it is the same type as
-           the expression return that type *)
         check_type (trvar var) (trexp exp).ty pos;
         { exp = (); ty = UNIT }
+    (* for a let expression, we bind some new envs then type check the body and return the result type *)
     | A.LetExp { decs; body; pos } ->
         (* add to env *)
         let { venv = new_venv; tenv = new_tenv } =
@@ -218,8 +222,7 @@ module Semant : SEMANT = struct
         let body_type = transExp new_venv new_tenv body in
 
         { exp = (); ty = body_type.ty }
-    (* recursively handle the delarations to build the environment,
-       then evaluate the body, returning its type *)
+    (* for an array, we type check the array itself, the int size and make sure that the init matches the array type *)
     | A.ArrayExp { typ; size; init; pos } ->
         (* Ensure typ is an array type *)
         let array_type =
