@@ -226,10 +226,15 @@ module Semant : SEMANT = struct
     | A.ArrayExp { typ; size; init; pos } ->
         (* Ensure typ is an array type *)
         let array_type =
+          print_endline typ;
           match S.look (tys, S.symbol typ) with
           | Some (Types.ARRAY (t, _)) -> t
-          | _ ->
+          | Some othertype ->
               Printf.printf "Type %s is not an array type\n" typ;
+              print_endline @@ Types.show_ty othertype;
+              raise @@ UnexpectedType pos.pos_lnum
+          | None ->
+              print_endline "Type not found";
               raise @@ UnexpectedType pos.pos_lnum
         in
         (* Ensure size is an integer *)
@@ -315,6 +320,8 @@ module Semant : SEMANT = struct
                   E.FunEntry { formals; result = result_type } ))
             vars funDecList
         in
+        Env.print_venv new_venv;
+        Env.print_tenv tys;
 
         { venv = new_venv; tenv = tys }
     | A.VarDec varDec ->
@@ -332,7 +339,11 @@ module Semant : SEMANT = struct
         let new_venv =
           S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
         in
+        Env.print_venv new_venv;
+        Env.print_tenv tys;
         { venv = new_venv; tenv = tys }
+    (* TODO: fix error in test1 where type is not added to environment *)
+    (* this is either a problem here, or a problem in the LetExp *)
     | A.TypeDec typeDecList ->
         let new_tenv =
           List.fold_left
@@ -343,6 +354,8 @@ module Semant : SEMANT = struct
               S.enter (tenv, S.symbol name, internal_ty))
             tys typeDecList
         in
+        Env.print_venv vars;
+        Env.print_tenv new_tenv;
         { venv = vars; tenv = new_tenv }
 
   and transTy tenv (typ : A.ty) =
@@ -354,7 +367,7 @@ module Semant : SEMANT = struct
         | None -> raise @@ UnboundIdentifier pos.pos_lnum)
     | A.ArrayTy (s, pos) -> (
         match S.look (tenv, S.symbol s) with
-        | Some t -> t
+        | Some t -> Types.ARRAY (t, ref ())
         | None -> raise @@ UnboundIdentifier pos.pos_lnum)
     | A.RecordTy fields ->
         let trans_field (f : A.field) =

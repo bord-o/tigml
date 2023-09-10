@@ -1,6 +1,6 @@
 open Symbol
 
-type unique = unit ref
+type unique = unit ref [@@deriving show]
 
 type ty =
   | RECORD of (Symbol.symbol * ty) list * unique
@@ -10,8 +10,9 @@ type ty =
   | ARRAY of ty * unique
   | NAME of Symbol.symbol * ty option ref
   | UNIT
+[@@deriving show]
 
-let string_of_type (s:ty) =
+let string_of_type (s : ty) =
   match s with
   | RECORD (_, _) -> "RECORD"
   | NIL -> "NIL"

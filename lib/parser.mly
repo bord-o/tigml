@@ -56,7 +56,7 @@ main:
   | exp EOF {(pp "main -> exp EOF"); $1}
 
 exp : 
-	| LET decs IN optexp END {(pp "exp ->let in end"); LetExp {decs=$2; body=$4; pos=$startpos}}
+	| LET decs IN optexp END {(pp "exp ->let in end"); LetExp {decs=List.rev $2; body=$4; pos=$startpos}}
 	| FOR ID ASSIGN exp TO exp DO exp %prec TO {(pp "exp -> for"); ForExp {var=$2; escape=ref true; lo=$4; hi=$6; body=$8; pos=$startpos}}
 	| IF exp THEN exp ELSE exp %prec ELSE {(pp "exp -> if then else"); IfExp {test=$2; then'=$4; else'=Some($6); pos=$startpos}}
 	| IF exp THEN exp %prec THEN {(pp "exp -> if then"); IfExp {test=$2; then'=$4; else'=None; pos=$startpos}}
