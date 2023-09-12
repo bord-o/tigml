@@ -110,12 +110,10 @@ decs :
 	| dec {(pp "decs -> single"); $1 :: []}
 	| decs dec {(pp @@ "decs -> multiple"); 
 		(match ($2, $1) with
-			(TypeDec [t], TypeDec ts :: ds) -> TypeDec (t :: ts) :: ds
-			| (FunctionDec [f], FunctionDec fs :: ds) -> FunctionDec (f :: fs) :: ds
+			| (TypeDec [t], TypeDec ts :: ds) -> TypeDec (ts @ [t]) :: ds
+			| (FunctionDec [f], FunctionDec fs :: ds) -> FunctionDec (fs @ [f]) :: ds
 			| (d, ds) -> d :: ds
-		)
-
-}
+		)}
 
 dec : 
 	| tydec	{(pp "dec -> type"); $1}

@@ -5,7 +5,7 @@ let process buf =
   try
     (* Run the parser on this line of input. *)
     let absyn = Parser.main Lexer.token buf in
-    print_endline @@ Absyn.show_exp absyn;
+    Printf.printf "%s\n\n" @@ Absyn.show_exp absyn;
     Semant.transProg absyn
   with
   (*
@@ -27,9 +27,9 @@ let () =
 
   let progs =
     [
-      "/home/bordo/tigml/test/test1.tig";
-      (*
       "/home/bordo/tigml/test/test2.tig";
+      (*
+      "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test3.tig";
       "/home/bordo/tigml/test/test4.tig";
       "/home/bordo/tigml/test/test5.tig";

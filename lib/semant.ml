@@ -355,6 +355,7 @@ module Semant : SEMANT = struct
           List.fold_left
             (fun tenv typedec ->
               let name = typedec.A.name in
+              print_endline name;
               let ty = typedec.A.ty in
               let internal_ty = transTy tenv ty in
               S.enter (tenv, S.symbol name, internal_ty))
