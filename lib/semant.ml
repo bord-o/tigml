@@ -146,6 +146,8 @@ module Semant : SEMANT = struct
             List.iter2
               (fun (lsym, ltype) (rsym, rtype, _) ->
                 if lsym <> S.symbol rsym then (
+                  (* TODO: fix this recursion *)
+                  print_endline "fail here";
                   Printf.printf "Expected %s" @@ S.name lsym;
                   raise @@ UnboundIdentifier pos.pos_lnum)
                 else ();

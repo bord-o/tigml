@@ -27,10 +27,10 @@ let () =
 
   let progs =
     [
-      "/home/bordo/tigml/test/test2.tig";
+      "/home/bordo/tigml/test/test3.tig";
       (*
       "/home/bordo/tigml/test/test1.tig";
-      "/home/bordo/tigml/test/test3.tig";
+      "/home/bordo/tigml/test/test2.tig";
       "/home/bordo/tigml/test/test4.tig";
       "/home/bordo/tigml/test/test5.tig";
       "/home/bordo/tigml/test/test6.tig";
