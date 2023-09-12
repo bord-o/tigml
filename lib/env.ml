@@ -18,13 +18,11 @@ let print_tenv (tenv : ty Symbol.table) =
   Symbol.Table.iter
     (fun sym ty ->
       Printf.printf "SYM: %s --> TYPE: %s\n" (show_symbol sym) (show_ty ty))
-    tenv;
-  print_endline "TEST"
+    tenv
 
 let print_venv (venv : enventry Symbol.table) =
   Symbol.Table.iter
     (fun sym entry ->
       Printf.printf "SYM: %s --> ENTRY: %s\n" (show_symbol sym)
         (show_enventry entry))
-    venv;
-  print_endline "TEST"
+    venv

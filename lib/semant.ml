@@ -158,11 +158,12 @@ module Semant : SEMANT = struct
 
         { exp = (); ty = RECORD (checked_fields, ref ()) }
     (* to check a seq we just make sure the last is a unit type, everything prior is ignored *)
-    | A.SeqExp exps ->
+    | A.SeqExp exps -> (
         (* you could force unit for all seq like last like in ocaml,
            but the language doesnt explicitly say that, so i will just ignore them *)
-        let exp, pos = List.(rev exps |> hd) in
-        trexp exp
+        match List.nth_opt (List.rev exps) 0 with
+        | Some (exp, pos) -> trexp exp
+        | None -> { exp = (); ty = UNIT })
     (* to check if, we make sure test is int, then we return the type of the executed branch depending on if the else exists *)
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
@@ -215,10 +216,19 @@ module Semant : SEMANT = struct
         (* add to env *)
         let { venv = new_venv; tenv = new_tenv } =
           List.fold_left
-            (fun acc dec -> transDec vars tys dec)
+            (fun acc dec ->
+              print_endline "Current Environment -------";
+              print_venv acc.venv;
+              print_tenv acc.tenv;
+              Printf.printf "Processing Declaration:\n %s\n\n" (A.show_dec dec);
+              transDec acc.venv acc.tenv dec)
             { venv = vars; tenv = tys }
             decs
         in
+
+        print_endline "Checking body with new environment:";
+        print_venv new_venv;
+        print_tenv new_tenv;
         let body_type = transExp new_venv new_tenv body in
 
         { exp = (); ty = body_type.ty }
@@ -226,13 +236,14 @@ module Semant : SEMANT = struct
     | A.ArrayExp { typ; size; init; pos } ->
         (* Ensure typ is an array type *)
         let array_type =
-          print_endline typ;
           match S.look (tys, S.symbol typ) with
-          | Some (Types.ARRAY (t, _)) -> t
-          | Some othertype ->
-              Printf.printf "Type %s is not an array type\n" typ;
-              print_endline @@ Types.show_ty othertype;
-              raise @@ UnexpectedType pos.pos_lnum
+          | Some t -> (
+              match actual_ty @@ t with
+              | Types.ARRAY (real_t, _) -> real_t
+              | othertype ->
+                  Printf.printf "Type %s is not an array type\n" typ;
+                  print_endline @@ Types.show_ty othertype;
+                  raise @@ UnexpectedType pos.pos_lnum)
           | None ->
               print_endline "Type not found";
               raise @@ UnexpectedType pos.pos_lnum
@@ -320,9 +331,6 @@ module Semant : SEMANT = struct
                   E.FunEntry { formals; result = result_type } ))
             vars funDecList
         in
-        Env.print_venv new_venv;
-        Env.print_tenv tys;
-
         { venv = new_venv; tenv = tys }
     | A.VarDec varDec ->
         let init_type = (transExp vars tys varDec.init).ty in
@@ -339,8 +347,6 @@ module Semant : SEMANT = struct
         let new_venv =
           S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
         in
-        Env.print_venv new_venv;
-        Env.print_tenv tys;
         { venv = new_venv; tenv = tys }
     (* TODO: fix error in test1 where type is not added to environment *)
     (* this is either a problem here, or a problem in the LetExp *)
@@ -354,8 +360,6 @@ module Semant : SEMANT = struct
               S.enter (tenv, S.symbol name, internal_ty))
             tys typeDecList
         in
-        Env.print_venv vars;
-        Env.print_tenv new_tenv;
         { venv = vars; tenv = new_tenv }
 
   and transTy tenv (typ : A.ty) =
