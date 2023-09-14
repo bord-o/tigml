@@ -148,7 +148,6 @@ module Semant : SEMANT = struct
               (fun (lsym, ltype) (rsym, rtype, _) ->
                 if lsym <> S.symbol rsym then (
                   (* TODO: fix this recursion *)
-                  print_endline "fail here";
                   Printf.printf "Expected %s" @@ S.name lsym;
                   raise @@ UnboundIdentifier pos.pos_lnum)
                 else ();
@@ -245,7 +244,7 @@ module Semant : SEMANT = struct
               | Types.ARRAY (real_t, _) -> real_t
               | othertype ->
                   Printf.printf "Type %s is not an array type\n" typ;
-                  print_endline @@ Types.show_ty othertype;
+                  (* print_endline @@ Types.show_ty othertype; *)
                   raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
           | None ->
               print_endline "Type not found";
@@ -336,10 +335,10 @@ module Semant : SEMANT = struct
         in
         { venv = new_venv; tenv = tys }
     | A.VarDec varDec ->
-        print_endline @@ A.show_exp varDec.init;
+        (* print_endline @@ A.show_exp varDec.init; *)
         let init_type = (transExp vars tys varDec.init).ty in
-        print_endline @@ show_ty init_type;
 
+        (* print_endline @@ show_ty init_type; *)
         let var_type =
           match varDec.typ with
           | Some (ty_name, ty_pos) -> (
@@ -348,7 +347,7 @@ module Semant : SEMANT = struct
               | None -> raise @@ UnboundIdentifier ty_pos.pos_lnum)
           | None -> init_type
         in
-        print_endline @@ show_ty var_type;
+        (* print_endline @@ show_ty var_type; *)
         if var_type <> init_type then
           raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__);
         let new_venv =
@@ -360,7 +359,7 @@ module Semant : SEMANT = struct
           List.fold_left
             (fun tenv typedec ->
               let name = typedec.A.name in
-              print_endline name;
+              (* print_endline name; *)
               let ty = typedec.A.ty in
               let internal_ty = transTy tenv ty in
               S.enter (tenv, S.symbol name, internal_ty))
