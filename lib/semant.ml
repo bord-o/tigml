@@ -29,10 +29,12 @@ module Semant : SEMANT = struct
   type tenv = Types.ty Symbol.table
   type newEnv = { venv : venv; tenv : tenv }
 
-  exception UnexpectedType of int
+  exception UnexpectedType of int * int
   exception UnboundIdentifier of int
   exception IncorrectNumberOfArguments of int
   exception IncorrectNumberOfFields of int
+
+  let third t = match t with _, loc, _, _ -> loc
 
   (* basic type checking function *)
   let check_type (e : expty) (expected : Types.ty) (p : A.pos) =
@@ -40,7 +42,7 @@ module Semant : SEMANT = struct
     else (
       Printf.printf "Expected %s, but found %s\n" (string_of_type expected)
         (string_of_type e.ty);
-      raise @@ UnexpectedType p.pos_lnum)
+      raise @@ UnexpectedType (p.pos_lnum, third __POS__))
 
   let rec transExp vars tys (exp : A.exp) =
     (* define wrappers for brevity *)
@@ -121,7 +123,7 @@ module Semant : SEMANT = struct
               List.iter2
                 (fun left_type right_type ->
                   if left_type <> right_type then
-                    raise @@ UnexpectedType pos.pos_lnum
+                    raise @@ UnexpectedType (pos.pos_lnum, third __POS__)
                   else ())
                 formals arg_tys;
               result
@@ -129,7 +131,6 @@ module Semant : SEMANT = struct
         { exp = (); ty = f_return_type }
     (* ccheck record field count and types like a function call *)
     | A.RecordExp { fields; typ; pos } ->
-        let checked_fields = [] in
         let record_type : ty =
           match S.look (tys, S.symbol typ) with
           | Some t -> t
@@ -156,9 +157,9 @@ module Semant : SEMANT = struct
         | other ->
             Printf.printf "Expected %s but found %s" "RECORD"
               (string_of_type other);
-            raise @@ UnexpectedType pos.pos_lnum);
+            raise @@ UnexpectedType (pos.pos_lnum, third __POS__));
 
-        { exp = (); ty = RECORD (checked_fields, ref ()) }
+        { exp = (); ty = record_type }
     (* to check a seq we just make sure the last is a unit type, everything prior is ignored *)
     | A.SeqExp exps -> (
         (* you could force unit for all seq like last like in ocaml,
@@ -245,10 +246,10 @@ module Semant : SEMANT = struct
               | othertype ->
                   Printf.printf "Type %s is not an array type\n" typ;
                   print_endline @@ Types.show_ty othertype;
-                  raise @@ UnexpectedType pos.pos_lnum)
+                  raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
           | None ->
               print_endline "Type not found";
-              raise @@ UnexpectedType pos.pos_lnum
+              raise @@ UnexpectedType (pos.pos_lnum, third __POS__)
         in
         (* Ensure size is an integer *)
         check_type (transExp vars tys size) INT pos;
@@ -280,10 +281,10 @@ module Semant : SEMANT = struct
             | Some fieldType -> { exp = (); ty = fieldType }
             | None ->
                 print_endline "Field not found in the record type";
-                raise @@ UnexpectedType pos.pos_lnum)
+                raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
         | _ ->
             print_endline "Expected a record type";
-            raise @@ UnexpectedType pos.pos_lnum)
+            raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
     | A.SubscriptVar (var, exp, pos) -> (
         let array_type = trvar var in
         let index_type = trexp exp in
@@ -291,7 +292,7 @@ module Semant : SEMANT = struct
         | ARRAY (elementType, _), INT -> { exp = (); ty = elementType }
         | _, _ ->
             print_endline "Array type or index type mismatch";
-            raise @@ UnexpectedType pos.pos_lnum)
+            raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
 
   and transDec vars tys (dec : A.dec) =
     match dec with
@@ -335,7 +336,10 @@ module Semant : SEMANT = struct
         in
         { venv = new_venv; tenv = tys }
     | A.VarDec varDec ->
+        print_endline @@ A.show_exp varDec.init;
         let init_type = (transExp vars tys varDec.init).ty in
+        print_endline @@ show_ty init_type;
+
         let var_type =
           match varDec.typ with
           | Some (ty_name, ty_pos) -> (
@@ -344,14 +348,13 @@ module Semant : SEMANT = struct
               | None -> raise @@ UnboundIdentifier ty_pos.pos_lnum)
           | None -> init_type
         in
+        print_endline @@ show_ty var_type;
         if var_type <> init_type then
-          raise @@ UnexpectedType varDec.pos.pos_lnum;
+          raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__);
         let new_venv =
           S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
         in
         { venv = new_venv; tenv = tys }
-    (* TODO: fix error in test1 where type is not added to environment *)
-    (* this is either a problem here, or a problem in the LetExp *)
     | A.TypeDec typeDecList ->
         let new_tenv =
           List.fold_left
