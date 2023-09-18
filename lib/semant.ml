@@ -355,16 +355,33 @@ module Semant : SEMANT = struct
         in
         { venv = new_venv; tenv = tys }
     | A.TypeDec typeDecList ->
+        let recursive_tenv =
+          List.fold_left
+            (fun tenv (typedec : A.typedec) ->
+              let name = typedec.A.name in
+              (* print_endline name; *)
+              S.enter (tenv, S.symbol name, NAME (S.symbol name, ref None)))
+            tys typeDecList
+        in
+
+        E.print_tenv recursive_tenv;
+        print_newline ();
+
         let new_tenv =
           List.fold_left
-            (fun tenv typedec ->
+            (fun tenv (typedec : A.typedec) ->
               let name = typedec.A.name in
               (* print_endline name; *)
               let ty = typedec.A.ty in
               let internal_ty = transTy tenv ty in
+
+              E.print_tenv recursive_tenv;
+              print_newline ();
+
               S.enter (tenv, S.symbol name, internal_ty))
-            tys typeDecList
+            recursive_tenv typeDecList
         in
+
         { venv = vars; tenv = new_tenv }
 
   and transTy tenv (typ : A.ty) =
