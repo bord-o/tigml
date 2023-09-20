@@ -24,6 +24,7 @@ let buf_of_file program =
 
 let run_prog prog =
   let filebuf = buf_of_file prog in
+  print_endline @@ "PROCESSING FILE: " ^ prog;
   process filebuf
 
 let () =
@@ -31,6 +32,9 @@ let () =
   let open Printf in
   let progs =
     [
+      "/home/bordo/tigml/test/test13.tig";
+      (*
+      "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test2.tig";
       "/home/bordo/tigml/test/test3.tig";
@@ -88,6 +92,7 @@ let () =
       "/home/bordo/tigml/test/ast3.tig";
       "/home/bordo/tigml/test/ast4.tig";
       "/home/bordo/tigml/test/ast5.tig";
+    *)
     ]
   in
 
