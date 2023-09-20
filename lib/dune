@@ -1,6 +1,8 @@
 (library
+ (public_name tigml)
  (name tigml)
  (libraries ppx_deriving)
+ (modules semant env symbol types absyn parser lexer)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord)))
 

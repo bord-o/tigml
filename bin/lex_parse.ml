@@ -15,20 +15,22 @@ let process buf =
   | Parser.Error -> raise Parser.Error
   | Lexer.Error msg -> print_endline msg
 
+let buf_of_file program =
+  let infile = open_in program in
+  let file_content = really_input_string infile (in_channel_length infile) in
+  close_in infile;
+
+  Lexing.from_string file_content
+
+let run_prog prog =
+  let filebuf = buf_of_file prog in
+  process filebuf
+
 let () =
   (* let infile = open_in "/home/bordo/tigml/test/calc.calc" in*)
   let open Printf in
-  let _dirs =
-    Sys.readdir "/home/bordo/tigml/test/"
-    |> Array.to_list
-    |> List.filter (String.ends_with ~suffix:".tig")
-    |> List.map (fun name -> "/home/bordo/tigml/test/" ^ name)
-  in
-
   let progs =
     [
-      "/home/bordo/tigml/test/test5.tig";
-      (*
       "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test2.tig";
       "/home/bordo/tigml/test/test3.tig";
@@ -81,25 +83,12 @@ let () =
       (* "/home/bordo/tigml/test/test49.tig";  this is supposed to syntax error*)
       "/home/bordo/tigml/test/merge.tig";
       "/home/bordo/tigml/test/queens.tig";
-	  "/home/bordo/tigml/test/ast1.tig";
-  	  "/home/bordo/tigml/test/ast2.tig";
-	  "/home/bordo/tigml/test/ast3.tig";
+      "/home/bordo/tigml/test/ast1.tig";
+      "/home/bordo/tigml/test/ast2.tig";
+      "/home/bordo/tigml/test/ast3.tig";
       "/home/bordo/tigml/test/ast4.tig";
       "/home/bordo/tigml/test/ast5.tig";
-    *)
     ]
   in
 
-  List.iter
-    (fun program ->
-      printf "Lexing program %s\n" program;
-      let infile = open_in program in
-      let file_content =
-        really_input_string infile (in_channel_length infile)
-      in
-      let filebuf = Lexing.from_string file_content in
-      process filebuf;
-      close_in infile;
-      printf "\n";
-      ignore @@ read_line ())
-    progs
+  List.iter run_prog progs

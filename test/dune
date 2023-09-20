@@ -1,2 +1,6 @@
 (test
- (name tigml))
+ (name runtest)
+ (libraries tigml alcotest)
+ (modules runtest)
+
+ )

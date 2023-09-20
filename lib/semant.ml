@@ -16,6 +16,11 @@ module type SEMANT = sig
   val transDec : venv -> tenv -> Absyn.dec -> newEnv
   val transTy : tenv -> Absyn.ty -> Types.ty
   val transProg : Absyn.exp -> unit
+
+  exception UnexpectedType of int * int
+  exception UnboundIdentifier of int
+  exception IncorrectNumberOfArguments of int
+  exception IncorrectNumberOfFields of int
 end
 
 module Semant : SEMANT = struct
@@ -141,6 +146,16 @@ module Semant : SEMANT = struct
             if List.length fields <> List.length type_fields then
               raise @@ IncorrectNumberOfFields pos.pos_lnum
             else ();
+
+            let check_record l r =
+              (* "NIL can be a member of any record" *)
+              if l = r || r = NIL then ()
+              else (
+                Printf.printf "record Expected %s, but found %s\n"
+                  (string_of_type l) (string_of_type r);
+                raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
+            in
+
             (* iterate through the type definitions fields and types,
                and make sure that both the name and type of each field
                correspond to thos in the expression IN ORDER!!! (easier) *)
@@ -151,7 +166,7 @@ module Semant : SEMANT = struct
                   Printf.printf "Expected %s" @@ S.name lsym;
                   raise @@ UnboundIdentifier pos.pos_lnum)
                 else ();
-                check_type (trexp rtype) ltype pos)
+                check_record ltype (trexp rtype).ty)
               type_fields fields
         | other ->
             Printf.printf "Expected %s but found %s" "RECORD"
