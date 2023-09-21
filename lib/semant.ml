@@ -21,6 +21,7 @@ module type SEMANT = sig
   exception UnboundIdentifier of int
   exception IncorrectNumberOfArguments of int
   exception IncorrectNumberOfFields of int
+  exception CantReassignType of int * string
 end
 
 module Semant : SEMANT = struct
@@ -38,12 +39,16 @@ module Semant : SEMANT = struct
   exception UnboundIdentifier of int
   exception IncorrectNumberOfArguments of int
   exception IncorrectNumberOfFields of int
+  exception CantReassignType of int * string
 
   let third t = match t with _, loc, _, _ -> loc
 
+  let check_nil l r =
+    match (l, r) with RECORD (_, _), NIL -> true | _, _ -> false
+
   (* basic type checking function *)
   let check_type (e : expty) (expected : Types.ty) (p : A.pos) =
-    if e.ty = expected then ()
+    if e.ty = expected || check_nil e.ty expected then ()
     else (
       Printf.printf "Expected %s, but found %s\n" (string_of_type expected)
         (string_of_type e.ty);
@@ -77,14 +82,31 @@ module Semant : SEMANT = struct
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
         { exp = (); ty = INT }
-    | A.OpExp { left; oper = A.EqOp; right; pos } ->
-        check_type (trexp left) INT pos;
-        check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
-    | A.OpExp { left; oper = A.NeqOp; right; pos } ->
-        check_type (trexp left) INT pos;
-        check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+    | A.OpExp { left; oper = A.EqOp; right; pos } -> (
+        (* TODO: implement for arrays and records*)
+        try
+          check_type (trexp left) INT pos;
+          check_type (trexp right) INT pos;
+          { exp = (); ty = INT }
+        with _ -> (
+          match ((trexp left).ty, (trexp right).ty) with
+          | RECORD (l, luniq), RECORD (r, runiq) when luniq == runiq ->
+              { exp = (); ty = INT }
+          | NIL, NIL -> { exp = (); ty = INT }
+          | _ -> raise @@ UnexpectedType (pos.pos_lnum, third __POS__)))
+    | A.OpExp { left; oper = A.NeqOp; right; pos } -> (
+        (* TODO: implement for arrays and records*)
+        try
+          check_type (trexp left) INT pos;
+          check_type (trexp right) INT pos;
+          { exp = (); ty = INT }
+        with _ -> (
+          match ((trexp left).ty, (trexp right).ty) with
+          | RECORD (l, luniq), RECORD (r, runiq) when luniq != runiq ->
+              { exp = (); ty = INT }
+          | NIL, _ -> { exp = (); ty = INT }
+          | _, NIL -> { exp = (); ty = INT }
+          | _ -> raise @@ UnexpectedType (pos.pos_lnum, third __POS__)))
     | A.OpExp { left; oper = A.LtOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
@@ -351,6 +373,16 @@ module Semant : SEMANT = struct
         { venv = new_venv; tenv = tys }
     | A.VarDec varDec ->
         (* print_endline @@ A.show_exp varDec.init; *)
+        let compare_records l r =
+          match (l, r) with
+          | RECORD (_, luniq), RECORD (_, runiq) when luniq != runiq ->
+              raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__)
+          | _ -> ()
+        in
+        let check_nil l r =
+          match (l, r) with RECORD (_, _), NIL -> true | _, _ -> false
+        in
+
         let init_type = (transExp vars tys varDec.init).ty in
 
         (* print_endline @@ show_ty init_type; *)
@@ -360,23 +392,43 @@ module Semant : SEMANT = struct
               match S.look (tys, S.symbol ty_name) with
               | Some t -> t
               | None -> raise @@ UnboundIdentifier ty_pos.pos_lnum)
-          | None -> init_type
+          | None ->
+              if init_type = NIL then
+                raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__)
+              else init_type
         in
         (* print_endline @@ show_ty var_type; *)
-        if var_type <> init_type then
+        Printf.printf "\n\nComparing var: \n%s to init: \n%s\n\n"
+          (show_ty var_type) (show_ty init_type);
+        if var_type <> init_type && (not @@ check_nil var_type init_type) then
           raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__);
+        compare_records var_type init_type;
         let new_venv =
           S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
         in
         { venv = new_venv; tenv = tys }
     | A.TypeDec typeDecList ->
-        let recursive_tenv =
+        let recursive_tenv, _ =
           List.fold_left
-            (fun tenv (typedec : A.typedec) ->
+            (fun (tenv, block_tenv) (typedec : A.typedec) ->
               let name = typedec.A.name in
               (* print_endline name; *)
-              S.enter (tenv, S.symbol name, NAME (S.symbol name, ref None)))
-            tys typeDecList
+              (* TODO: this works in generall but needs to be limited to one recursiv block *)
+              (match S.look (block_tenv, S.symbol name) with
+              | Some entry ->
+                  raise @@ CantReassignType (typedec.pos.pos_lnum, name)
+              | _ -> ());
+
+              (*keep an extra accumulator for the current block that starts empty*)
+              (* this is just to make sure we arent breaking test 38*)
+              let new_tenv =
+                S.enter (tenv, S.symbol name, NAME (S.symbol name, ref None))
+              in
+              let new_block_env =
+                S.enter (tenv, S.symbol name, NAME (S.symbol name, ref None))
+              in
+              (new_tenv, new_block_env))
+            (tys, Symbol.empty) typeDecList
         in
 
         E.print_tenv recursive_tenv;
