@@ -8,9 +8,9 @@ Still trying to decide what I should target for the backend...
 ## Building
 
 - Run:
--   opam install the dependencies
--   make
+  - opam install the dependencies
+  - make
 
 - Tests:
--   make runtest
+  - make runtest
 
