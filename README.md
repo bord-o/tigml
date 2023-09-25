@@ -8,7 +8,7 @@ Still trying to decide what I should target for the backend...
 ## Building
 
 - Run:
-  - opam install the dependencies
+  - opam install --deps-only .
   - make
 
 - Tests:
