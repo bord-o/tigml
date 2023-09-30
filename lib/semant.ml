@@ -1,9 +1,7 @@
 open Env
 open Symbol
+open Translate
 
-module Translate = struct
-  type exp = unit
-end
 
 module type SEMANT = sig
   type expty = { exp : Translate.exp; ty : Types.ty }

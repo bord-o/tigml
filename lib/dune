@@ -2,7 +2,7 @@
  (public_name tigml)
  (name tigml)
  (libraries ppx_deriving)
- (modules semant env symbol types absyn parser lexer)
+ (modules semant env symbol types absyn parser lexer translate riscvframe)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord)))
 
