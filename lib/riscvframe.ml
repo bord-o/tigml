@@ -1,44 +1,36 @@
-module type Temp = sig
-  type label
-  type temp
+open Temp
 
-  module type Table
+type frame = unit
+type access = InFrame of int | InReg of Temp.temp
+type framearg = { name : unit; formals : bool list }
 
-  (*  returns a new temp from inf set  *)
-  val newtemp : unit -> temp
-  (* returns a new lable from inf set *)
-  val newlabel : unit -> label
-  (* returns a new label whose assembly name is 'string' *)
-  val namedlabel : string -> label
-end
+(* how will the param be seen from in the function *)
+(* eg register vs frame and how will we "view shift" *)
+let name (f: frame) : Temp.label =  "Test"
+let newFrame (call : framearg) = ()
+let formals (frame : frame) = []
+let allocLocal (frame : frame) (escape : bool) = InFrame 0
 
-module Temp = struct
-  type label = unit
-  type temp
-end
+(*
+  A variable escapes if 
+      - it is passed by reference 
 
-module type Frame = sig
-  type frame
-  type access
-  type framearg = { name : unit; formals : bool list }
+        'function(x)' (x escapes if it is a pointer)
 
-  val newFrame : framearg -> frame
-  val formals : frame -> Temp.label
-  val allocLocal : frame -> bool -> access
-end
+      - its address is taken 
 
-module Riscvframe : Frame = struct
-  type frame = unit
-  type access = InFrame of int | InReg of Temp.temp
-  type framearg = { name : unit; formals : bool list }
+        'function(x) {
+          some_global_variable = &x (x escapes here)
+          return;
+        }
 
-  (* how will the param be seen from in the function *)
-  (* eg register vs frame and how will we "view shift" *)
-  let newFrame (call : framearg) = ()
-  let formals (frame : frame) = ()
-  let allocLocal (frame : frame) (escape : bool) = InFrame 0
-end
+      - it is accessed from a nested function
 
-module type FindEscape = sig
-  val findEscape : Absyn.exp -> unit
-end
+        'function(x) {
+          void nested(y) {
+            return x + y; (x escapes here)
+            ( here the nested function would get a pointer to the stack frame of the containing function "static link")
+          }
+        }
+
+ *)

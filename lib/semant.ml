@@ -2,16 +2,16 @@ open Env
 open Symbol
 open Translate
 
-
 module type SEMANT = sig
   type expty = { exp : Translate.exp; ty : Types.ty }
   type venv
   type tenv
   type newEnv = { venv : venv; tenv : tenv }
 
-  val transExp : venv -> tenv -> Absyn.exp -> expty
-  val transVar : venv -> tenv -> Absyn.var -> expty
-  val transDec : venv -> tenv -> Absyn.dec -> newEnv
+  (* TODO level should be a real type *)
+  val transExp : venv -> tenv -> int -> Absyn.exp -> expty
+  val transVar : venv -> tenv -> int -> Absyn.var -> expty
+  val transDec : venv -> tenv -> int -> Absyn.dec -> newEnv
   val transTy : tenv -> Absyn.ty -> Types.ty
   val transProg : Absyn.exp -> unit
 
@@ -52,10 +52,10 @@ module Semant : SEMANT = struct
         (string_of_type e.ty);
       raise @@ UnexpectedType (p.pos_lnum, third __POS__))
 
-  let rec transExp vars tys (exp : A.exp) =
+  let rec transExp vars tys level (exp : A.exp) =
     (* define wrappers for brevity *)
-    let trexp = transExp vars tys in
-    let trvar = transVar vars tys in
+    let trexp = transExp vars tys 0 in
+    let trvar = transVar vars tys 0 in
     (* define function to find the concrete type of a type *)
     let rec actual_ty = function
       | NAME (_, { contents = Some real_type }) -> actual_ty real_type
@@ -204,8 +204,7 @@ module Semant : SEMANT = struct
     (* to check if, we make sure test is int, then we return the type of the executed branch depending on if the else exists *)
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
-        let () = check_type (trexp test) INT pos in
-        match else' with
+        let () = check_type (trexp test) INT pos in match else' with
         | None -> { exp = (); ty = then_type }
         | Some else' ->
             check_type (trexp else') then_type pos;
@@ -235,7 +234,7 @@ module Semant : SEMANT = struct
 
         (* Check the body of the loop using the new environment.
            We expect it to be of type UNIT *)
-        let body_checked = transExp new_vars_env tys body in
+        let body_checked = transExp new_vars_env tys 0 body in
         check_type body_checked UNIT pos;
 
         (* Ensure that 'var' is not assigned to in 'body'.*)
@@ -258,7 +257,7 @@ module Semant : SEMANT = struct
               print_venv acc.venv;
               print_tenv acc.tenv;
               Printf.printf "Processing Declaration:\n %s\n\n" (A.show_dec dec);
-              transDec acc.venv acc.tenv dec)
+              transDec acc.venv acc.tenv 0 dec)
             { venv = vars; tenv = tys }
             decs
         in
@@ -266,7 +265,7 @@ module Semant : SEMANT = struct
         print_endline "Checking body with new environment:";
         print_venv new_venv;
         print_tenv new_tenv;
-        let body_type = transExp new_venv new_tenv body in
+        let body_type = transExp new_venv new_tenv 0 body in
 
         { exp = (); ty = body_type.ty }
     (* for an array, we type check the array itself, the int size and make sure that the init matches the array type *)
@@ -286,15 +285,15 @@ module Semant : SEMANT = struct
               raise @@ UnexpectedType (pos.pos_lnum, third __POS__)
         in
         (* Ensure size is an integer *)
-        check_type (transExp vars tys size) INT pos;
+        check_type (transExp vars tys 0 size) INT pos;
         (* Ensure init type matches the base type of the array *)
-        check_type (transExp vars tys init) array_type pos;
+        check_type (transExp vars tys 0 init) array_type pos;
 
         { exp = (); ty = Types.ARRAY (array_type, ref ()) }
 
-  and transVar vars tys (var : A.var) =
-    let trexp = transExp vars tys in
-    let trvar = transVar vars tys in
+  and transVar vars tys level (var : A.var) =
+    let trexp = transExp vars tys 0 in
+    let trvar = transVar vars tys 0 in
 
     match var with
     | A.SimpleVar (sym, pos) ->
@@ -328,7 +327,8 @@ module Semant : SEMANT = struct
             print_endline "Array type or index type mismatch";
             raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
 
-  and transDec vars tys (dec : A.dec) =
+  and transDec vars tys level (dec : A.dec) =
+    (* this is where most of our AR code goes ig *)
     match dec with
     | A.FunctionDec funDecList ->
         let new_venv =
@@ -381,7 +381,7 @@ module Semant : SEMANT = struct
           match (l, r) with RECORD (_, _), NIL -> true | _, _ -> false
         in
 
-        let init_type = (transExp vars tys varDec.init).ty in
+        let init_type = (transExp vars tys 0 varDec.init).ty in
 
         (* print_endline @@ show_ty init_type; *)
         let var_type =
@@ -450,7 +450,6 @@ module Semant : SEMANT = struct
         { venv = vars; tenv = new_tenv }
 
   and transTy tenv (typ : A.ty) =
-    (* TODO: figure out the actual type function and where it should be used*)
     match typ with
     | A.NameTy (s, pos) -> (
         match S.look (tenv, S.symbol s) with
@@ -470,8 +469,5 @@ module Semant : SEMANT = struct
         RECORD (internal_fields, ref ())
 
   (* ignore the result to just type check *)
-  let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv e
-  (* TODO: refactor to let me pass in test environments
-     in order to unit test some of my type checking
-     before getting to declarations *)
+  let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv 0 e
 end
