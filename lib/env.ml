@@ -1,10 +1,9 @@
 open Symbol
 
-type access = unit
 type ty = Types.ty [@@deriving show]
 
 type enventry =
-  | VarEntry of { ty : ty }
+  | VarEntry of { ty : ty; access : Translate.access }
   | FunEntry of { formals : ty list; result : ty }
 [@@deriving show]
 

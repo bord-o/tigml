@@ -1,6 +1,6 @@
-type level
+type level [@@deriving show]
 (* not the same as Frame.access *)
-type access
+type access [@@deriving show]
 type newLevelArg = { parent : level; name : Temp.label; formals : bool list }
 type exp = unit
 

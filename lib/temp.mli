@@ -1,5 +1,5 @@
-type label = string
-type temp
+type label = string [@@deriving show]
+type temp [@@deriving show]
 
 
 (*  returns a new temp from inf set  *)

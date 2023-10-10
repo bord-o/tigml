@@ -9,9 +9,9 @@ module type SEMANT = sig
   type newEnv = { venv : venv; tenv : tenv }
 
   (* TODO level should be a real type *)
-  val transExp : venv -> tenv -> int -> Absyn.exp -> expty
-  val transVar : venv -> tenv -> int -> Absyn.var -> expty
-  val transDec : venv -> tenv -> int -> Absyn.dec -> newEnv
+  val transExp : venv -> tenv -> Translate.level -> Absyn.exp -> expty
+  val transVar : venv -> tenv -> Translate.level -> Absyn.var -> expty
+  val transDec : venv -> tenv -> Translate.level -> Absyn.dec -> newEnv
   val transTy : tenv -> Absyn.ty -> Types.ty
   val transProg : Absyn.exp -> unit
 
@@ -54,8 +54,8 @@ module Semant : SEMANT = struct
 
   let rec transExp vars tys level (exp : A.exp) =
     (* define wrappers for brevity *)
-    let trexp = transExp vars tys 0 in
-    let trvar = transVar vars tys 0 in
+    let trexp = transExp vars tys level in
+    let trvar = transVar vars tys level in
     (* define function to find the concrete type of a type *)
     let rec actual_ty = function
       | NAME (_, { contents = Some real_type }) -> actual_ty real_type
@@ -204,7 +204,8 @@ module Semant : SEMANT = struct
     (* to check if, we make sure test is int, then we return the type of the executed branch depending on if the else exists *)
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
-        let () = check_type (trexp test) INT pos in match else' with
+        let () = check_type (trexp test) INT pos in
+        match else' with
         | None -> { exp = (); ty = then_type }
         | Some else' ->
             check_type (trexp else') then_type pos;
@@ -229,12 +230,13 @@ module Semant : SEMANT = struct
         (* Temporarily introduce 'var' into the environment with type INT.
            This shadows any outer variable with the same name. *)
         let new_vars_env =
+          (* TODO fix all existing use of varentry to have an access. here we will need to allocLocal *)
           S.enter (vars, S.symbol var, VarEntry { ty = INT })
         in
 
         (* Check the body of the loop using the new environment.
            We expect it to be of type UNIT *)
-        let body_checked = transExp new_vars_env tys 0 body in
+        let body_checked = transExp new_vars_env tys level body in
         check_type body_checked UNIT pos;
 
         (* Ensure that 'var' is not assigned to in 'body'.*)
@@ -257,7 +259,8 @@ module Semant : SEMANT = struct
               print_venv acc.venv;
               print_tenv acc.tenv;
               Printf.printf "Processing Declaration:\n %s\n\n" (A.show_dec dec);
-              transDec acc.venv acc.tenv 0 dec)
+              (* TODO pass level to main functions correctly *)
+              transDec acc.venv acc.tenv level dec)
             { venv = vars; tenv = tys }
             decs
         in
@@ -265,7 +268,7 @@ module Semant : SEMANT = struct
         print_endline "Checking body with new environment:";
         print_venv new_venv;
         print_tenv new_tenv;
-        let body_type = transExp new_venv new_tenv 0 body in
+        let body_type = transExp new_venv new_tenv level body in
 
         { exp = (); ty = body_type.ty }
     (* for an array, we type check the array itself, the int size and make sure that the init matches the array type *)
@@ -285,15 +288,15 @@ module Semant : SEMANT = struct
               raise @@ UnexpectedType (pos.pos_lnum, third __POS__)
         in
         (* Ensure size is an integer *)
-        check_type (transExp vars tys 0 size) INT pos;
+        check_type (transExp vars tys level size) INT pos;
         (* Ensure init type matches the base type of the array *)
-        check_type (transExp vars tys 0 init) array_type pos;
+        check_type (transExp vars tys level init) array_type pos;
 
         { exp = (); ty = Types.ARRAY (array_type, ref ()) }
 
   and transVar vars tys level (var : A.var) =
-    let trexp = transExp vars tys 0 in
-    let trvar = transVar vars tys 0 in
+    let trexp = transExp vars tys level in
+    let trvar = transVar vars tys level in
 
     match var with
     | A.SimpleVar (sym, pos) ->
@@ -330,6 +333,7 @@ module Semant : SEMANT = struct
   and transDec vars tys level (dec : A.dec) =
     (* this is where most of our AR code goes ig *)
     match dec with
+    (* TODO handle frame creation *)
     | A.FunctionDec funDecList ->
         let new_venv =
           List.fold_left
@@ -361,6 +365,9 @@ module Semant : SEMANT = struct
                 | None -> UNIT
               in
 
+              (* TODO: make a new level here and update the FunEntry with a new level*)
+              (* TODO: update FunEntry constructor to take the Temp.label and level of the new frame*)
+
               (* Update venv with function details *)
               S.enter
                 ( venv,
@@ -368,7 +375,9 @@ module Semant : SEMANT = struct
                   E.FunEntry { formals; result = result_type } ))
             vars funDecList
         in
+
         { venv = new_venv; tenv = tys }
+    (* TODO handle local creation *)
     | A.VarDec varDec ->
         (* print_endline @@ A.show_exp varDec.init; *)
         let compare_records l r =
@@ -381,7 +390,7 @@ module Semant : SEMANT = struct
           match (l, r) with RECORD (_, _), NIL -> true | _, _ -> false
         in
 
-        let init_type = (transExp vars tys 0 varDec.init).ty in
+        let init_type = (transExp vars tys level varDec.init).ty in
 
         (* print_endline @@ show_ty init_type; *)
         let var_type =
@@ -402,6 +411,9 @@ module Semant : SEMANT = struct
           raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__);
         compare_records var_type init_type;
         let new_venv =
+          (* TODO: make a new local here and update the VarEntry with a new access*)
+          (* TODO: update VarEntry constructor to take the new access*)
+          let access = Translate.allocLocal level true in
           S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
         in
         { venv = new_venv; tenv = tys }
@@ -469,5 +481,6 @@ module Semant : SEMANT = struct
         RECORD (internal_fields, ref ())
 
   (* ignore the result to just type check *)
-  let transProg e = ignore @@ transExp Env.base_venv Env.base_tenv 0 e
+  let transProg e =
+    ignore @@ transExp Env.base_venv Env.base_tenv Translate.outermost e
 end
