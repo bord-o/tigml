@@ -52,5 +52,4 @@ let allocLocal (frame : frame) (escape : bool) =
             ( here the nested function would get a pointer to the stack frame of the containing function "static link")
           }
         }
-
  *)

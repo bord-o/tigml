@@ -32,7 +32,7 @@ let () =
   let open Printf in
   let progs =
     [
-      "/home/bordo/tigml/test/merge.tig";
+      "/home/bordo/tigml/test/test1.tig";
       (*
       "/home/bordo/tigml/test/test1.tig";
       "/home/bordo/tigml/test/test1.tig";

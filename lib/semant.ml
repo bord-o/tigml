@@ -230,8 +230,9 @@ module Semant : SEMANT = struct
         (* Temporarily introduce 'var' into the environment with type INT.
            This shadows any outer variable with the same name. *)
         let new_vars_env =
-          (* TODO fix all existing use of varentry to have an access. here we will need to allocLocal *)
-          S.enter (vars, S.symbol var, VarEntry { ty = INT })
+          (* TODO fix all existing use of varentry to have an access. here we will need to allocLocal DONE *)
+          let access = allocLocal level true in
+          S.enter (vars, S.symbol var, VarEntry { ty = INT; access })
         in
 
         (* Check the body of the loop using the new environment.
@@ -259,7 +260,7 @@ module Semant : SEMANT = struct
               print_venv acc.venv;
               print_tenv acc.tenv;
               Printf.printf "Processing Declaration:\n %s\n\n" (A.show_dec dec);
-              (* TODO pass level to main functions correctly *)
+              (* TODO pass level to main functions correctly DONE *)
               transDec acc.venv acc.tenv level dec)
             { venv = vars; tenv = tys }
             decs
@@ -367,12 +368,28 @@ module Semant : SEMANT = struct
 
               (* TODO: make a new level here and update the FunEntry with a new level*)
               (* TODO: update FunEntry constructor to take the Temp.label and level of the new frame*)
+              let escaping_formals = List.map (fun arg -> true) formals in
+              let new_level =
+                newLevel
+                  (* TODO: formals should map all existing formals to escape*)
+                  {
+                    parent = level;
+                    name = Temp.newlabel ();
+                    formals = escaping_formals;
+                  }
+              in
 
               (* Update venv with function details *)
               S.enter
                 ( venv,
                   S.symbol name,
-                  E.FunEntry { formals; result = result_type } ))
+                  E.FunEntry
+                    {
+                      level = new_level;
+                      label = Temp.newlabel ();
+                      formals;
+                      result = result_type;
+                    } ))
             vars funDecList
         in
 
@@ -413,8 +430,10 @@ module Semant : SEMANT = struct
         let new_venv =
           (* TODO: make a new local here and update the VarEntry with a new access*)
           (* TODO: update VarEntry constructor to take the new access*)
+          (* TODO: right now all variables escape as the book says *)
           let access = Translate.allocLocal level true in
-          S.enter (vars, S.symbol varDec.name, E.VarEntry { ty = var_type })
+          S.enter
+            (vars, S.symbol varDec.name, E.VarEntry { ty = var_type; access })
         in
         { venv = new_venv; tenv = tys }
     | A.TypeDec typeDecList ->
@@ -482,5 +501,11 @@ module Semant : SEMANT = struct
 
   (* ignore the result to just type check *)
   let transProg e =
-    ignore @@ transExp Env.base_venv Env.base_tenv Translate.outermost e
+    let main_level =
+      newLevel
+        { parent = Translate.outermost; name = Temp.newlabel (); formals = [] }
+    in
+
+    (* we tell the base venv that it is at the main level here per book instruction *)
+    ignore @@ transExp (Env.base_venv main_level) Env.base_tenv main_level e
 end
