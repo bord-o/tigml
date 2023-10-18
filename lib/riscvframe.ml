@@ -1,3 +1,5 @@
+open Tree
+
 type access = InFrame of int | InReg of Temp.temp [@@deriving show]
 
 type frame = {
@@ -8,6 +10,9 @@ type frame = {
 [@@deriving show]
 
 type framearg = { name : Temp.label; formals : bool list }
+
+let fp = Temp.newtemp () (* frame pointer *)
+let wordSize = 32
 
 (* how will the param be seen from in the function *)
 (* eg register vs frame and how will we "view shift" *)
@@ -30,6 +35,12 @@ let allocLocal (frame : frame) (escape : bool) =
   let new_access = if escape then InFrame 0 else InReg (Temp.newtemp ()) in
   frame.locals := new_access :: !(frame.locals);
   new_access
+
+let exp (a : access) tree_exp =
+  match a with
+  | InFrame i -> Mem (Binop (Plus, tree_exp, Const i)) (* need to calc offset *)
+  | InReg reg -> Temp reg
+(* just the register *)
 
 (*
   A variable escapes if 

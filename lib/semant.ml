@@ -8,7 +8,6 @@ module type SEMANT = sig
   type tenv
   type newEnv = { venv : venv; tenv : tenv }
 
-  (* TODO level should be a real type *)
   val transExp : venv -> tenv -> Translate.level -> Absyn.exp -> expty
   val transVar : venv -> tenv -> Translate.level -> Absyn.var -> expty
   val transDec : venv -> tenv -> Translate.level -> Absyn.dec -> newEnv
@@ -230,7 +229,6 @@ module Semant : SEMANT = struct
         (* Temporarily introduce 'var' into the environment with type INT.
            This shadows any outer variable with the same name. *)
         let new_vars_env =
-          (* TODO fix all existing use of varentry to have an access. here we will need to allocLocal DONE *)
           let access = allocLocal level true in
           S.enter (vars, S.symbol var, VarEntry { ty = INT; access })
         in
@@ -260,7 +258,6 @@ module Semant : SEMANT = struct
               print_venv acc.venv;
               print_tenv acc.tenv;
               Printf.printf "Processing Declaration:\n %s\n\n" (A.show_dec dec);
-              (* TODO pass level to main functions correctly DONE *)
               transDec acc.venv acc.tenv level dec)
             { venv = vars; tenv = tys }
             decs
@@ -366,12 +363,9 @@ module Semant : SEMANT = struct
                 | None -> UNIT
               in
 
-              (* TODO: make a new level here and update the FunEntry with a new level*)
-              (* TODO: update FunEntry constructor to take the Temp.label and level of the new frame*)
               let escaping_formals = List.map (fun arg -> true) formals in
               let new_level =
                 newLevel
-                  (* TODO: formals should map all existing formals to escape*)
                   {
                     parent = level;
                     name = Temp.newlabel ();
@@ -428,8 +422,6 @@ module Semant : SEMANT = struct
           raise @@ UnexpectedType (varDec.pos.pos_lnum, third __POS__);
         compare_records var_type init_type;
         let new_venv =
-          (* TODO: make a new local here and update the VarEntry with a new access*)
-          (* TODO: update VarEntry constructor to take the new access*)
           (* TODO: right now all variables escape as the book says *)
           let access = Translate.allocLocal level true in
           S.enter
@@ -442,7 +434,7 @@ module Semant : SEMANT = struct
             (fun (tenv, block_tenv) (typedec : A.typedec) ->
               let name = typedec.A.name in
               (* print_endline name; *)
-              (* TODO: this works in generall but needs to be limited to one recursiv block *)
+              (* TODO: this works in general but needs to be limited to one recursive block *)
               (match S.look (block_tenv, S.symbol name) with
               | Some entry ->
                   raise @@ CantReassignType (typedec.pos.pos_lnum, name)
