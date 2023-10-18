@@ -32,6 +32,7 @@ let newFrame (call : framearg) =
 
 let allocLocal (frame : frame) (escape : bool) =
   (* TODO what do i do if this escapes*)
+  (* TODO need to calculate the next offset based on wordSize. Also figure out where the current offset is stored*)
   let new_access = if escape then InFrame 0 else InReg (Temp.newtemp ()) in
   frame.locals := new_access :: !(frame.locals);
   new_access

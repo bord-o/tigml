@@ -1,4 +1,12 @@
-TODO: 
-	make module Semant
-		make transProg: Absyn.exp -> unit
-	make module Env
+TODO FEATURES: 
+	TODO: Make labels for temp registers work
+	TODO: Fix alloc local
+	TODO: fix alloc frame
+	TODO: what is concrete type of Temp.temp
+	TODO: Start translating the AST in Translate
+	TODO: 
+
+TODO DEBT:
+	TODO: Fix array semantic analysis 
+	TODO: Fix the rest of the operator expressions for equality of arrays 
+	TODO: Fix the rest of the operator expressions for equality of records
