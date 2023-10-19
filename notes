@@ -2,8 +2,8 @@ TODO FEATURES:
 	TODO: Make labels for temp registers work
 	TODO: Fix alloc local
 	TODO: fix alloc frame
-	TODO: what is concrete type of Temp.temp
-	TODO: Start translating the AST in Translate
+	TODO: Add function calls for Translate.(proper translation function here) to semant
+	TODO: Scaffold Translate with all the AST translation functions
 	TODO: 
 
 TODO DEBT:
