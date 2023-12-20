@@ -12,7 +12,10 @@ type level =
 [@@deriving show]
 
 type access = Global | Local of level * Frame.access [@@deriving show]
-type exp = unit
+type exp = 
+  Ex of Tree.exp (* expression *)
+  | Nx of Tree.stm (* no result *)
+  | Cx of (Temp.label * Temp.label -> Tree.stm) (* conditional *)
 type newLevelArg = { parent : level; name : Temp.label; formals : bool list }
 
 let outermost = Outermost
@@ -38,3 +41,7 @@ let allocLocal level escapes : access =
       if escapes then Frame.InFrame 0 else Frame.InReg (Temp.newtemp ())
     in
     Local (level, alloc)
+
+let unEx e = Tree.Const 0 
+let unNx e = Tree.Exp(Tree.Const 0)
+let unCx e = fun (l1, l2) -> Tree.Exp(Tree.Const 0)

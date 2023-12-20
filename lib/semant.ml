@@ -66,64 +66,64 @@ module Semant : SEMANT = struct
     | A.OpExp { left; oper = A.PlusOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp =Translate.Ex(Tree.Const 1); ty = INT }
     | A.OpExp { left; oper = A.MinusOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = Translate.Ex(Tree.Const 1); ty = INT }
     | A.OpExp { left; oper = A.TimesOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp =Translate.Ex(Tree.Const 1) ; ty = INT }
     | A.OpExp { left; oper = A.DivideOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = Translate.Ex(Tree.Const 1); ty = INT }
     | A.OpExp { left; oper = A.EqOp; right; pos } -> (
         (* TODO: implement for arrays and records*)
         try
           check_type (trexp left) INT pos;
           check_type (trexp right) INT pos;
-          { exp = (); ty = INT }
+          { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
         with _ -> (
           match ((trexp left).ty, (trexp right).ty) with
           | RECORD (l, luniq), RECORD (r, runiq) when luniq == runiq ->
-              { exp = (); ty = INT }
-          | NIL, NIL -> { exp = (); ty = INT }
+              { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
+          | NIL, NIL -> { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
           | _ -> raise @@ UnexpectedType (pos.pos_lnum, third __POS__)))
     | A.OpExp { left; oper = A.NeqOp; right; pos } -> (
         (* TODO: implement for arrays and records*)
         try
           check_type (trexp left) INT pos;
           check_type (trexp right) INT pos;
-          { exp = (); ty = INT }
+          { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
         with _ -> (
           match ((trexp left).ty, (trexp right).ty) with
           | RECORD (l, luniq), RECORD (r, runiq) when luniq != runiq ->
-              { exp = (); ty = INT }
-          | NIL, _ -> { exp = (); ty = INT }
-          | _, NIL -> { exp = (); ty = INT }
+              { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
+          | NIL, _ -> { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
+          | _, NIL -> { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
           | _ -> raise @@ UnexpectedType (pos.pos_lnum, third __POS__)))
     | A.OpExp { left; oper = A.LtOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
     | A.OpExp { left; oper = A.LeOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
     | A.OpExp { left; oper = A.GtOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
     | A.OpExp { left; oper = A.GeOp; right; pos } ->
         check_type (trexp left) INT pos;
         check_type (trexp right) INT pos;
-        { exp = (); ty = INT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
     (* our concrete expressions return their types *)
-    | A.NilExp -> { exp = (); ty = NIL }
-    | A.IntExp value -> { exp = (); ty = INT }
-    | A.StringExp (value, _) -> { exp = (); ty = STRING }
+    | A.NilExp -> { exp = (Translate.Ex(Tree.Const 1)); ty = NIL }
+    | A.IntExp value -> { exp = (Translate.Ex(Tree.Const 1)); ty = INT }
+    | A.StringExp (value, _) -> { exp = (Translate.Ex(Tree.Const 1)); ty = STRING }
     (* variable expressions can just use the other function *)
     | A.VarExp v -> trvar v
     (* call expressions type check expected arg count and types, and returns the return type of the callee *)
@@ -152,7 +152,7 @@ module Semant : SEMANT = struct
                 formals arg_tys;
               result
         in
-        { exp = (); ty = f_return_type }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = f_return_type }
     (* ccheck record field count and types like a function call *)
     | A.RecordExp { fields; typ; pos } ->
         let record_type : ty =
@@ -192,30 +192,30 @@ module Semant : SEMANT = struct
               (string_of_type other);
             raise @@ UnexpectedType (pos.pos_lnum, third __POS__));
 
-        { exp = (); ty = record_type }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = record_type }
     (* to check a seq we just make sure the last is a unit type, everything prior is ignored *)
     | A.SeqExp exps -> (
         (* you could force unit for all seq like last like in ocaml,
            but the language doesnt explicitly say that, so i will just ignore them *)
         match List.nth_opt (List.rev exps) 0 with
         | Some (exp, pos) -> trexp exp
-        | None -> { exp = (); ty = UNIT })
+        | None -> { exp = (Translate.Ex(Tree.Const 1)); ty = UNIT })
     (* to check if, we make sure test is int, then we return the type of the executed branch depending on if the else exists *)
     | A.IfExp { test; then'; else'; pos } -> (
         let then_type = (trexp then').ty in
         let () = check_type (trexp test) INT pos in
         match else' with
-        | None -> { exp = (); ty = then_type }
+        | None -> { exp = (Translate.Ex(Tree.Const 1)); ty = then_type }
         | Some else' ->
             check_type (trexp else') then_type pos;
-            { exp = (); ty = then_type })
+            { exp = (Translate.Ex(Tree.Const 1)); ty = then_type })
     (* just unit for now *)
-    | A.BreakExp _ -> { exp = (); ty = UNIT }
+    | A.BreakExp _ -> { exp = (Translate.Ex(Tree.Const 1)); ty = UNIT }
     (* just check that the test is int and body is unit*)
     | A.WhileExp { test; body; pos } ->
         check_type (trexp test) INT pos;
         check_type (trexp body) UNIT pos;
-        { exp = (); ty = UNIT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = UNIT }
     (* hande the var with recursion, make sure it is an int, make sure
        lo and high are ints, return body type*)
     | A.ForExp { var; escape; lo; hi; body; pos } ->
@@ -242,12 +242,12 @@ module Semant : SEMANT = struct
         if contains_assignment_to body var then failwith "forbiddent assignment";
 
         (* Return type of the ForExp is UNIT *)
-        { exp = (); ty = UNIT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = UNIT }
     (* hande the var with recursion, make sure it is the same type as
        the expression return that type *)
     | A.AssignExp { var; exp; pos } ->
         check_type (trvar var) (trexp exp).ty pos;
-        { exp = (); ty = UNIT }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = UNIT }
     (* for a let expression, we bind some new envs then type check the body and return the result type *)
     | A.LetExp { decs; body; pos } ->
         (* add to env *)
@@ -268,7 +268,7 @@ module Semant : SEMANT = struct
         print_tenv new_tenv;
         let body_type = transExp new_venv new_tenv level body in
 
-        { exp = (); ty = body_type.ty }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = body_type.ty }
     (* for an array, we type check the array itself, the int size and make sure that the init matches the array type *)
     | A.ArrayExp { typ; size; init; pos } ->
         (* Ensure typ is an array type *)
@@ -290,7 +290,7 @@ module Semant : SEMANT = struct
         (* Ensure init type matches the base type of the array *)
         check_type (transExp vars tys level init) array_type pos;
 
-        { exp = (); ty = Types.ARRAY (array_type, ref ()) }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = Types.ARRAY (array_type, ref ()) }
 
   and transVar vars tys level (var : A.var) =
     let trexp = transExp vars tys level in
@@ -306,13 +306,13 @@ module Semant : SEMANT = struct
               raise @@ UnboundIdentifier pos.pos_lnum
           | None -> raise @@ UnboundIdentifier pos.pos_lnum
         in
-        { exp = (); ty = t1 }
+        { exp = (Translate.Ex(Tree.Const 1)); ty = t1 }
     | A.FieldVar (var, sym, pos) -> (
         let record_type = trvar var in
         match record_type.ty with
         | RECORD (fields, _) -> (
             match List.assoc_opt (S.symbol sym) fields with
-            | Some fieldType -> { exp = (); ty = fieldType }
+            | Some fieldType -> { exp = (Translate.Ex(Tree.Const 1)); ty = fieldType }
             | None ->
                 print_endline "Field not found in the record type";
                 raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
@@ -323,7 +323,7 @@ module Semant : SEMANT = struct
         let array_type = trvar var in
         let index_type = trexp exp in
         match (array_type.ty, index_type.ty) with
-        | ARRAY (elementType, _), INT -> { exp = (); ty = elementType }
+        | ARRAY (elementType, _), INT -> { exp = (Translate.Ex(Tree.Const 1)); ty = elementType }
         | _, _ ->
             print_endline "Array type or index type mismatch";
             raise @@ UnexpectedType (pos.pos_lnum, third __POS__))
