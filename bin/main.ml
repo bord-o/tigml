@@ -4,18 +4,15 @@ let process buf =
   try
     (* Run the parser on this line of input. *)
     let absyn = Parser.main Lexer.token buf in
-    print_endline @@ Tigml.Absyn.show_exp absyn;
-    print_endline "Success!"
+    (* print_endline @@ Tigml.Absyn.show_exp absyn; *)
+    print_endline "Parse success!";
+    Tigml.Semant.transProg absyn
+
   with
-  (*
-    ignore (Lexer.token buf);
-    process buf
-    *)
   | Parser.Error -> raise Parser.Error
   | Lexer.Error msg -> print_endline @@ "lexer error: " ^ msg
 
 let () =
-  (* let infile = open_in "/home/bordo/tigml/test/calc.calc" in*)
   let open Printf in
   let _dirs =
     Sys.readdir "/Users/brodylittle/Git/tigml/test/"
@@ -26,13 +23,13 @@ let () =
 
   let progs =
     [
+      (*
       "/Users/brodylittle/Git/tigml/test/test1.tig";
       "/Users/brodylittle/Git/tigml/test/test2.tig";
       "/Users/brodylittle/Git/tigml/test/test3.tig";
       "/Users/brodylittle/Git/tigml/test/test4.tig";
       "/Users/brodylittle/Git/tigml/test/test5.tig";
       "/Users/brodylittle/Git/tigml/test/test6.tig";
-      (*
       "/Users/brodylittle/Git/tigml/test/test7.tig";
       "/Users/brodylittle/Git/tigml/test/test8.tig";
       "/Users/brodylittle/Git/tigml/test/test9.tig";
@@ -78,14 +75,14 @@ let () =
       "/Users/brodylittle/Git/tigml/test/test48.tig";
       (* "/Users/brodylittle/Git/tigml/test/test49.tig";  this is supposed to syntax error*)
       "/Users/brodylittle/Git/tigml/test/merge.tig";
-      "/Users/brodylittle/Git/tigml/test/queens.tig";
 	  "/Users/brodylittle/Git/tigml/test/ast1.tig";
   	  "/Users/brodylittle/Git/tigml/test/ast2.tig";
 	  "/Users/brodylittle/Git/tigml/test/ast3.tig";
       "/Users/brodylittle/Git/tigml/test/ast4.tig";
       "/Users/brodylittle/Git/tigml/test/ast5.tig";
-    *)
       "/Users/brodylittle/Git/tigml/test/ast5.tig";
+    *)
+      "/Users/brodylittle/Git/tigml/test/queens.tig";
     ]
   in
 
