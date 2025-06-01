@@ -1,92 +1,90 @@
 open Tigml
-open Semant
 
 let process buf =
   try
     (* Run the parser on this line of input. *)
-    let absyn = Parser.main Lexer.token buf in
-    Absyn.print_exp absyn 0;
-    Semant.transProg absyn
+    let _absyn = Parser.main Lexer.token buf in
+    print_endline "Success!"
   with
   (*
     ignore (Lexer.token buf);
     process buf
     *)
   | Parser.Error -> raise Parser.Error
-  | Lexer.Error msg -> print_endline msg
+  | Lexer.Error msg -> print_endline @@ "lexer error: " ^ msg
 
 let () =
   (* let infile = open_in "/home/bordo/tigml/test/calc.calc" in*)
   let open Printf in
   let _dirs =
-    Sys.readdir "/home/bordo/tigml/test/"
+    Sys.readdir "/Users/brodylittle/Git/tigml/test/"
     |> Array.to_list
     |> List.filter (String.ends_with ~suffix:".tig")
-    |> List.map (fun name -> "/home/bordo/tigml/test/" ^ name)
+    |> List.map (fun name -> "/Users/brodylittle/Git/tigml/test/" ^ name)
   in
 
   let progs =
     [
+      "/Users/brodylittle/Git/tigml/test/test1.tig";
+      "/Users/brodylittle/Git/tigml/test/test2.tig";
+      "/Users/brodylittle/Git/tigml/test/test3.tig";
+      "/Users/brodylittle/Git/tigml/test/test4.tig";
+      "/Users/brodylittle/Git/tigml/test/test5.tig";
+      "/Users/brodylittle/Git/tigml/test/test6.tig";
       (*
-      "/home/bordo/tigml/test/test1.tig";
-      "/home/bordo/tigml/test/test2.tig";
-      "/home/bordo/tigml/test/test3.tig";
-      "/home/bordo/tigml/test/test4.tig";
-      "/home/bordo/tigml/test/test5.tig";
-      "/home/bordo/tigml/test/test6.tig";
-      "/home/bordo/tigml/test/test7.tig";
-      "/home/bordo/tigml/test/test8.tig";
-      "/home/bordo/tigml/test/test9.tig";
-      "/home/bordo/tigml/test/test10.tig";
-      "/home/bordo/tigml/test/test11.tig";
-      "/home/bordo/tigml/test/test12.tig";
-      "/home/bordo/tigml/test/test13.tig";
-      "/home/bordo/tigml/test/test14.tig";
-      "/home/bordo/tigml/test/test15.tig";
-      "/home/bordo/tigml/test/test16.tig";
-      "/home/bordo/tigml/test/test17.tig";
-      "/home/bordo/tigml/test/test18.tig";
-      "/home/bordo/tigml/test/test18.tig";
-      "/home/bordo/tigml/test/test19.tig";
-      "/home/bordo/tigml/test/test20.tig";
-      "/home/bordo/tigml/test/test21.tig";
-      "/home/bordo/tigml/test/test22.tig";
-      "/home/bordo/tigml/test/test23.tig";
-      "/home/bordo/tigml/test/test24.tig";
-      "/home/bordo/tigml/test/test25.tig";
-      "/home/bordo/tigml/test/test26.tig";
-      "/home/bordo/tigml/test/test27.tig";
-      "/home/bordo/tigml/test/test28.tig";
-      "/home/bordo/tigml/test/test29.tig";
-      "/home/bordo/tigml/test/test30.tig";
-      "/home/bordo/tigml/test/test31.tig";
-      "/home/bordo/tigml/test/test32.tig";
-      "/home/bordo/tigml/test/test33.tig";
-      "/home/bordo/tigml/test/test34.tig";
-      "/home/bordo/tigml/test/test35.tig";
-      "/home/bordo/tigml/test/test36.tig";
-      "/home/bordo/tigml/test/test37.tig";
-      "/home/bordo/tigml/test/test38.tig";
-      "/home/bordo/tigml/test/test39.tig";
-      "/home/bordo/tigml/test/test40.tig";
-      "/home/bordo/tigml/test/test41.tig";
-      "/home/bordo/tigml/test/test42.tig";
-      "/home/bordo/tigml/test/test43.tig";
-      "/home/bordo/tigml/test/test44.tig";
-      "/home/bordo/tigml/test/test45.tig";
-      "/home/bordo/tigml/test/test46.tig";
-      "/home/bordo/tigml/test/test47.tig";
-      "/home/bordo/tigml/test/test48.tig";
-      (* "/home/bordo/tigml/test/test49.tig";  this is supposed to syntax error*)
-      "/home/bordo/tigml/test/merge.tig";
-      "/home/bordo/tigml/test/queens.tig";
-	  "/home/bordo/tigml/test/ast1.tig";
-  	  "/home/bordo/tigml/test/ast2.tig";
-	  "/home/bordo/tigml/test/ast3.tig";
-      "/home/bordo/tigml/test/ast4.tig";
-      "/home/bordo/tigml/test/ast5.tig";
+      "/Users/brodylittle/Git/tigml/test/test7.tig";
+      "/Users/brodylittle/Git/tigml/test/test8.tig";
+      "/Users/brodylittle/Git/tigml/test/test9.tig";
+      "/Users/brodylittle/Git/tigml/test/test10.tig";
+      "/Users/brodylittle/Git/tigml/test/test11.tig";
+      "/Users/brodylittle/Git/tigml/test/test12.tig";
+      "/Users/brodylittle/Git/tigml/test/test13.tig";
+      "/Users/brodylittle/Git/tigml/test/test14.tig";
+      "/Users/brodylittle/Git/tigml/test/test15.tig";
+      "/Users/brodylittle/Git/tigml/test/test16.tig";
+      "/Users/brodylittle/Git/tigml/test/test17.tig";
+      "/Users/brodylittle/Git/tigml/test/test18.tig";
+      "/Users/brodylittle/Git/tigml/test/test18.tig";
+      "/Users/brodylittle/Git/tigml/test/test19.tig";
+      "/Users/brodylittle/Git/tigml/test/test20.tig";
+      "/Users/brodylittle/Git/tigml/test/test21.tig";
+      "/Users/brodylittle/Git/tigml/test/test22.tig";
+      "/Users/brodylittle/Git/tigml/test/test23.tig";
+      "/Users/brodylittle/Git/tigml/test/test24.tig";
+      "/Users/brodylittle/Git/tigml/test/test25.tig";
+      "/Users/brodylittle/Git/tigml/test/test26.tig";
+      "/Users/brodylittle/Git/tigml/test/test27.tig";
+      "/Users/brodylittle/Git/tigml/test/test28.tig";
+      "/Users/brodylittle/Git/tigml/test/test29.tig";
+      "/Users/brodylittle/Git/tigml/test/test30.tig";
+      "/Users/brodylittle/Git/tigml/test/test31.tig";
+      "/Users/brodylittle/Git/tigml/test/test32.tig";
+      "/Users/brodylittle/Git/tigml/test/test33.tig";
+      "/Users/brodylittle/Git/tigml/test/test34.tig";
+      "/Users/brodylittle/Git/tigml/test/test35.tig";
+      "/Users/brodylittle/Git/tigml/test/test36.tig";
+      "/Users/brodylittle/Git/tigml/test/test37.tig";
+      "/Users/brodylittle/Git/tigml/test/test38.tig";
+      "/Users/brodylittle/Git/tigml/test/test39.tig";
+      "/Users/brodylittle/Git/tigml/test/test40.tig";
+      "/Users/brodylittle/Git/tigml/test/test41.tig";
+      "/Users/brodylittle/Git/tigml/test/test42.tig";
+      "/Users/brodylittle/Git/tigml/test/test43.tig";
+      "/Users/brodylittle/Git/tigml/test/test44.tig";
+      "/Users/brodylittle/Git/tigml/test/test45.tig";
+      "/Users/brodylittle/Git/tigml/test/test46.tig";
+      "/Users/brodylittle/Git/tigml/test/test47.tig";
+      "/Users/brodylittle/Git/tigml/test/test48.tig";
+      (* "/Users/brodylittle/Git/tigml/test/test49.tig";  this is supposed to syntax error*)
+      "/Users/brodylittle/Git/tigml/test/merge.tig";
+      "/Users/brodylittle/Git/tigml/test/queens.tig";
+	  "/Users/brodylittle/Git/tigml/test/ast1.tig";
+  	  "/Users/brodylittle/Git/tigml/test/ast2.tig";
+	  "/Users/brodylittle/Git/tigml/test/ast3.tig";
+      "/Users/brodylittle/Git/tigml/test/ast4.tig";
+      "/Users/brodylittle/Git/tigml/test/ast5.tig";
     *)
-      "/home/bordo/tigml/test/ast5.tig";
+      "/Users/brodylittle/Git/tigml/test/ast5.tig";
     ]
   in
 
