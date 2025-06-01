@@ -1,4 +1,0 @@
-TODO: 
-	make module Semant
-		make transProg: Absyn.exp -> unit
-	make module Env

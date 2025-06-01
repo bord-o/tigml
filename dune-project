@@ -1,28 +1,21 @@
-(lang dune 3.8)
+(lang dune 3.19)
 
 (name tigml)
 
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github bord-o/tigml))
 
-(authors "Author Name")
-
-(maintainers "Maintainer Name")
+(authors "Brody Little")
 
 (license LICENSE)
-
-(documentation https://url/to/documentation)
 
 (using menhir 2.1)
 
 (package
  (name tigml)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune)
- (tags
-  (topics "to describe" your project)))
+ (synopsis "Implementation of Appel's compiler in OCaml")
+ (depends ocaml dune))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
