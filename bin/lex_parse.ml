@@ -3,7 +3,8 @@ open Tigml
 let process buf =
   try
     (* Run the parser on this line of input. *)
-    let _absyn = Parser.main Lexer.token buf in
+    let absyn = Parser.main Lexer.token buf in
+    print_endline @@ Tigml.Absyn.show_exp absyn;
     print_endline "Success!"
   with
   (*

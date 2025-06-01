@@ -1,5 +1,7 @@
 (library
- (name tigml))
+ (name tigml)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.ord)))
 
 (ocamllex lexer)
 

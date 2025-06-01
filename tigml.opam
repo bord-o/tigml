@@ -8,6 +8,7 @@ bug-reports: "https://github.com/bord-o/tigml/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.19"}
+  "ppx_deriving"
   "odoc" {with-doc}
 ]
 build: [

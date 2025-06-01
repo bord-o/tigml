@@ -16,6 +16,6 @@
 (package
  (name tigml)
  (synopsis "Implementation of Appel's compiler in OCaml")
- (depends ocaml dune))
+ (depends ocaml dune ppx_deriving))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
