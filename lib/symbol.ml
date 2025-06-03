@@ -28,5 +28,5 @@ end)
 type 'a table = 'a Table.t
 
 let empty = Table.empty
-let enter (t, k, v) = Table.add k v t
-let look (t, k) = Table.find_opt k t
+let enter k v t = Table.add k v t
+let look k t = Table.find_opt k t

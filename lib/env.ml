@@ -1,5 +1,5 @@
 type access
-type ty
+type ty = Types.ty
 
 type enventry =
   | VarEntry of { ty : ty }

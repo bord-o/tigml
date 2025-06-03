@@ -1,4 +1,4 @@
-type unique = unit ref
+type unique = unit ref [@@deriving show]
 
 type ty =
   | RECORD of (Symbol.symbol * ty) list * unique
@@ -7,4 +7,4 @@ type ty =
   | STRING
   | ARRAY of ty * unique
   | NAME of Symbol.symbol * ty option ref
-  | UNIT
+  | UNIT [@@deriving show]
