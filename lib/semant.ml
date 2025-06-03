@@ -56,10 +56,20 @@ let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
       | l, A.GeOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
       (* And and or are short-circuiting and are handled in the parser *)
       | (l_type, op, r_type) as e -> Error (`InvalidOperation e))
+  | A.IfExp { test; then'; else'; pos } as z -> (
+      let* _, test_ck = checkexp test in
+      if test_ck <> T.INT then Error (`IfExpTestNotAnInteger z)
+      else
+        let* _, then_ck = checkexp then' in
+        match else' with
+        | Some e ->
+            let* _, else_ck = checkexp e in
+            if then_ck <> else_ck then Error `IfExpBranchTypesDiffer
+            else Ok (z, then_ck)
+        | None -> Ok (z, then_ck))
   | A.RecordExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.SeqExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.AssignExp _ as z -> Error (`UnimplementedTypechecking z)
-  | A.IfExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.WhileExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.ForExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.BreakExp _ as z -> Error (`UnimplementedTypechecking z)
