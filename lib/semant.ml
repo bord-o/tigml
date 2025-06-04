@@ -33,7 +33,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
       Ok (z, Types.NIL)
   | A.IntExp _ as z -> Ok (z, Types.INT)
   | A.StringExp (_, _) as z -> Ok (z, Types.STRING)
-  | A.CallExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.OpExp oper as z -> (
       let op = oper.oper in
       let* _, left = checkexp oper.left in
@@ -57,20 +56,49 @@ let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
       (* And and or are short-circuiting and are handled in the parser *)
       | (l_type, op, r_type) as e -> Error (`InvalidOperation e))
   | A.IfExp { test; then'; else'; pos } as z -> (
-      let* _, test_ck = checkexp test in
-      if test_ck <> T.INT then Error (`IfExpTestNotAnInteger z)
+      let* _, test_ty = checkexp test in
+      if test_ty <> T.INT then Error (`IfExpTestNotAnInteger z)
       else
-        let* _, then_ck = checkexp then' in
+        let* _, then_ty = checkexp then' in
         match else' with
         | Some e ->
-            let* _, else_ck = checkexp e in
-            if then_ck <> else_ck then Error `IfExpBranchTypesDiffer
-            else Ok (z, then_ck)
-        | None -> Ok (z, then_ck))
+            let* _, else_ty = checkexp e in
+            if then_ty <> else_ty then Error (`IfExpBranchTypesDiffer z)
+            else Ok (z, then_ty)
+        | None -> Ok (z, then_ty))
+  | A.CallExp { func; args; pos } as z -> (
+      (* For a funciton call, check that provided arguments match expected types, and return result type if so *)
+      match S.look (S.symbol func) vars with
+      | None -> Error (`FunctionNotFound z)
+      | Some (VarEntry { ty }) -> Error (`ExpectedFunctionFoundVar (z, ty))
+      | Some (FunEntry { formals; result }) ->
+          let rec check_args expected got =
+            match (expected, got) with
+            | [], [] -> Ok (z, result)
+            | e :: exps, g :: gots ->
+                let* _, got_type = checkexp g in
+                if e = got_type then check_args exps gots
+                else Error (`FunctionArgumentWrongType z)
+            | [], _ | _, [] -> Error `UnexpectedNumberOfArguments
+          in
+          check_args formals args)
   | A.RecordExp _ as z -> Error (`UnimplementedTypechecking z)
-  | A.SeqExp _ as z -> Error (`UnimplementedTypechecking z)
+  | A.SeqExp exps as z -> (
+      (* A sequence's type is the last type in the list, or unit if it is empty *)
+      match List.nth_opt (List.rev exps) 0 with
+      | Some (exp, pos) ->
+          let* _, ty = checkexp exp in
+          Ok (z, ty)
+      | None -> Ok (z, T.UNIT))
+  | A.WhileExp { test; body; pos } as z -> (
+      let* _, test_type = checkexp test in
+      let* _, body_type = checkexp body in
+      match (test_type, body_type) with
+      | T.INT, T.UNIT -> Ok (z, T.UNIT)
+      | _, T.UNIT -> Error (`WhileTestNotInt z)
+      | T.INT, _ -> Error (`WhileBodyNotUnit z)
+      | _, _ -> Error (`WhileTestAndBodyWrongType z))
   | A.AssignExp _ as z -> Error (`UnimplementedTypechecking z)
-  | A.WhileExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.ForExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.BreakExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.LetExp _ as z -> Error (`UnimplementedTypechecking z)
