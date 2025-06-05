@@ -1,5 +1,5 @@
-[@@@warning "-27"]
-[@@@warning "-26"]
+(* [@@@warning "-27"] *)
+(* [@@@warning "-26"] *)
 
 module S = Symbol
 module A = Absyn
@@ -16,44 +16,46 @@ let sequence_results results =
   in
   aux [] results
 
-type typecheck_err = [ `ArrayNotTypeArray of A.exp
- | `ArraySizeNotInteger of A.exp
- | `ArrayTypeNotFound of A.exp
- | `ArrayTypeTranslationNotFound of string * A.pos
- | `AssignmentTypesDontmatch of A.exp
- | `CantAccessFieldOfNonRecordVariable of A.exp
- | `CantAccessSubscriptOfNonArrayVariable of A.exp
- | `CantReassignForLoopVariable of A.exp
- | `ExpectedFunctionFoundVar of A.exp
- | `ExpectedVariableGotFunction of A.exp
- | `ForLoopBodyReturnsValue of A.exp
- | `ForLoopIndexesNotIntegers of A.exp
- | `FunctionArgumentWrongType of A.exp
- | `FunctionNotFound of A.exp
- | `FunctionResultAnnotationNotFound of A.pos
- | `FunctionTypeAnnotationDoesntMatchExpression of A.pos
- | `IfExpBranchTypesDiffer of A.exp
- | `IfExpTestNotAnInteger of A.exp
- | `InvalidOperation of A.exp
- | `NameTypeTranslationNotFound of string * A.pos
- | `RecordFieldDoesntExist of A.exp
- | `RecordFieldNamesAndTypesDontMatch of A.exp
- | `RecordFieldNamesDontMatch of A.exp
- | `RecordFieldTypesDontMatch of A.exp
- | `RecordTypeNotFound of A.exp
- | `RecordTypeNotRecord of A.exp
- | `RecordTypeTranslatinoNotFound of string
- | `SubscriptMustBeInteger of A.exp
- | `SubscriptNonArrayAndNonIntegerIndex of A.exp
- | `UnexpectedNumberOfArguments of A.exp
- | `UnknownFunctionDecArgType
- | `VariableNotFound of A.exp
- | `VariableTypeAnnotationDoesntMatchExpression of A.pos
- | `VariableTypeAnnotationNotFound of A.pos
- | `WhileBodyNotUnit of A.exp
- | `WhileTestAndBodyWrongType of A.exp
- | `WhileTestNotInt of A.exp
- | `WrongNumberOfFields of A.exp ] [@@deriving show]
+type typecheck_err =
+  [ `ArrayNotTypeArray of A.exp
+  | `ArraySizeNotInteger of A.exp
+  | `ArrayTypeNotFound of A.exp
+  | `ArrayTypeTranslationNotFound of string * A.pos
+  | `AssignmentTypesDontmatch of A.exp
+  | `CantAccessFieldOfNonRecordVariable of A.exp
+  | `CantAccessSubscriptOfNonArrayVariable of A.exp
+  | `CantReassignForLoopVariable of A.exp
+  | `ExpectedFunctionFoundVar of A.exp
+  | `ExpectedVariableGotFunction of A.exp
+  | `ForLoopBodyReturnsValue of A.exp
+  | `ForLoopIndexesNotIntegers of A.exp
+  | `FunctionArgumentWrongType of A.exp
+  | `FunctionNotFound of A.exp
+  | `FunctionResultAnnotationNotFound of A.pos
+  | `FunctionTypeAnnotationDoesntMatchExpression of A.pos
+  | `IfExpBranchTypesDiffer of A.exp
+  | `IfExpTestNotAnInteger of A.exp
+  | `InvalidOperation of A.exp
+  | `NameTypeTranslationNotFound of string * A.pos
+  | `RecordFieldDoesntExist of A.exp
+  | `RecordFieldNamesAndTypesDontMatch of A.exp
+  | `RecordFieldNamesDontMatch of A.exp
+  | `RecordFieldTypesDontMatch of A.exp
+  | `RecordTypeNotFound of A.exp
+  | `RecordTypeNotRecord of A.exp
+  | `RecordTypeTranslatinoNotFound of string
+  | `SubscriptMustBeInteger of A.exp
+  | `SubscriptNonArrayAndNonIntegerIndex of A.exp
+  | `UnexpectedNumberOfArguments of A.exp
+  | `UnknownFunctionDecArgType
+  | `VariableNotFound of A.exp
+  | `VariableTypeAnnotationDoesntMatchExpression of A.pos
+  | `VariableTypeAnnotationNotFound of A.pos
+  | `WhileBodyNotUnit of A.exp
+  | `WhileTestAndBodyWrongType of A.exp
+  | `WhileTestNotInt of A.exp
+  | `WrongNumberOfFields of A.exp ]
+[@@deriving show]
 
 (*
   typecheck takes a abstract syntx node, validates its type, and
@@ -91,7 +93,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         in
         Ok (T.RECORD (internal_fields, ref ()))
   in
-
 
   let both_ints_or_strings = function
     | T.INT, T.INT | T.STRING, T.STRING -> true
@@ -272,7 +273,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             Ok (vars, new_types)
         | A.VarDec { name; escape; typ; init; pos } ->
-          print_endline "vd";
+            print_endline "vd";
             let* _, init_ty = typecheck vars types init in
             let* var_ty =
               match typ with
@@ -290,7 +291,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             Ok (new_vars, types)
         | A.FunctionDec fundecs ->
-            let check_fundecs var_env = function
+            let rec check_fundecs var_env = function
               | [] -> Ok var_env
               | A.{ name; params; result; body; _ } :: ds ->
                   let* formals =
@@ -307,20 +308,18 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                     | Some (s, pos) -> (
                         match S.look (S.symbol s) types with
                         | None -> Error (`FunctionResultAnnotationNotFound pos)
-                        | Some t when t <> body_ty->
+                        | Some t when t <> body_ty ->
                             Error
                               (`FunctionTypeAnnotationDoesntMatchExpression pos)
                         | Some t -> Ok t)
                   in
 
-                  let fe = Env.FunEntry { formals; result=result_ty } in
-                  let new_vars =
-                    S.enter (S.symbol name) fe vars
-                  in
-
-                  Ok new_vars
+                  let fe = Env.FunEntry { formals; result = result_ty } in
+                  let new_vars = S.enter (S.symbol name) fe vars in
+                  check_fundecs new_vars ds
             in
-            Ok (vars, types)
+            let* new_vars = check_fundecs vars fundecs in
+            Ok (new_vars, types)
       in
 
       let rec checkdecs vars types = function
@@ -337,31 +336,16 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* _, body_type = typecheck new_vars new_types body in
       Ok (z, body_type)
 
-(*
-  translate takes a type annotated syntax node and generates
-  intermediate code
-*)
-let translate vars types (p : Absyn.exp) =
-  match p with
-  | Absyn.VarExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.NilExp as z -> Error (`UnimplementedTranslation z)
-  | Absyn.IntExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.StringExp (_, _) as z -> Error (`UnimplementedTranslation z)
-  | Absyn.CallExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.OpExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.RecordExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.SeqExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.AssignExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.IfExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.WhileExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.ForExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.BreakExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.LetExp _ as z -> Error (`UnimplementedTranslation z)
-  | Absyn.ArrayExp _ as z -> Error (`UnimplementedTranslation z)
-
 let typecheckProg' (p : Absyn.exp) =
-  let vars = Symbol.empty in
-  let types = Symbol.empty |> Symbol.enter (Symbol.symbol "int") T.INT |> Symbol.enter (Symbol.symbol "string") T.STRING  in
+  let vars =
+    Symbol.empty
+    |> Symbol.enter (Symbol.symbol "print") (Env.FunEntry {formals = [ T.STRING ]; result = T.UNIT })
+  in
+  let types =
+    Symbol.empty
+    |> Symbol.enter (Symbol.symbol "int") T.INT
+    |> Symbol.enter (Symbol.symbol "string") T.STRING
+  in
   let* typechecked, _type = typecheck vars types p in
   Ok ()
 
