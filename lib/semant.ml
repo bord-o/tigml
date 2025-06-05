@@ -25,14 +25,33 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     | _ -> false
   in
   match p with
-  | A.VarExp (A.SimpleVar (name, pos)) as z -> (
+  | A.VarExp (A.SimpleVar (name, _)) as z -> (
       (* Variable type is looked up in environment *)
-      match vars |> S.look @@ S.symbol name with
-      | Some (Env.VarEntry v) -> Ok (z, v.ty)
-      | Some (Env.FunEntry f) ->
-          Error (`ExpectedVariableFoundFunction (name, pos))
-      | None -> Error (`UnboundVariable name))
-  | A.VarExp v as z -> Error (`UnimplementedTypechecking z)
+      let* found_var =
+        S.look (S.symbol name) vars |> Option.to_result ~none:`VariableNotFound
+      in
+      match found_var with
+      | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
+      | Env.VarEntry v -> Ok (z, v.ty))
+  | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
+      let* _, record_type = checkexp (A.VarExp var) in
+      match record_type with
+      | T.RECORD (fields, r) ->
+          let* field_ty =
+            fields
+            |> List.assoc_opt (S.symbol sym)
+            |> Option.to_result ~none:`RecordFieldDoesntExist
+          in
+          Ok (z, T.INT)
+      | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
+  | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
+      let* _, array_type = checkexp (A.VarExp var) in
+      let* _, index_type = checkexp exp' in
+      match (array_type, index_type) with
+      | T.ARRAY (under_type, r), T.INT -> Ok (z, under_type)
+      | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
+      | T.ARRAY _, _ -> Error (`SubscriptMustBeInteger z)
+      | _ -> Error `SubscriptNonArrayAndNonIntegerIndex)
   | A.NilExp as z ->
       (* Concrete Nil returns its type *)
       Ok (z, Types.NIL)
@@ -128,20 +147,22 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], [] -> Ok (z, found_type)
             | _v, [] -> Error (`WrongNumberOfFields z)
             | [], _v -> Error (`WrongNumberOfFields z)
-            | (name', exp', _ ):: ls, (r_sym, r_ty) :: rs ->
-
-              let l_sym= S.symbol name' in
-              let* (_, l_ty) = checkexp exp' in
-              match (l_sym = r_sym, l_ty = r_ty) with
-              | true, true -> check_fields (ls, rs)
-              | false, true -> Error (`RecordFieldNamesDontMatch)
-              | true, false -> Error (`RecordFieldTypesDontMatch)
-              | false, false -> Error (`RecordFieldNamesAndTypesDontMatch)
+            | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
+                let l_sym = S.symbol name' in
+                let* _, l_ty = checkexp exp' in
+                match (l_sym = r_sym, l_ty = r_ty) with
+                | true, true -> check_fields (ls, rs)
+                | false, true -> Error `RecordFieldNamesDontMatch
+                | true, false -> Error `RecordFieldTypesDontMatch
+                | false, false -> Error `RecordFieldNamesAndTypesDontMatch)
           in
           check_fields (fields, found_fields)
-
       | _ -> Error (`RecordTypeNotRecord z))
-  | A.AssignExp _ as z -> Error (`UnimplementedTypechecking z)
+  | A.AssignExp { var; exp; _ } as z ->
+      let* _, var_type = checkexp (A.VarExp var) in
+      let* _, exp_type = checkexp exp in
+      if var_type = exp_type then Ok (z, T.UNIT)
+      else Error `AssignmentTypesDontmatch
   | A.ForExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.LetExp _ as z -> Error (`UnimplementedTypechecking z)
 
