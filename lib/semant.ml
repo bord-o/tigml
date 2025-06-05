@@ -1,54 +1,92 @@
 [@@@warning "-27"]
+[@@@warning "-26"]
 
 module S = Symbol
 module A = Absyn
 module T = Types
-open Fun
 
 let ( let* ) = Result.bind
 let ( let$ ) = Option.bind
 
- type typecheck_error = [`ArrayNotTypeArray of A.exp
-  | `ArraySizeNotInteger of A.exp
-  | `ArrayTypeNotFound of A.exp
-  | `AssignmentTypesDontmatch of A.exp
-  | `CantAccessFieldOfNonRecordVariable of A.exp
-  | `CantAccessSubscriptOfNonArrayVariable of A.exp
-  | `CantReassignForLoopVariable of A.exp
-  | `ExpectedFunctionFoundVar of A.exp
-  | `ExpectedVariableGotFunction of A.exp
-  | `ForLoopBodyReturnsValue of A.exp
-  | `ForLoopIndexesNotIntegers of A.exp
-  | `FunctionArgumentWrongType of A.exp
-  | `FunctionNotFound of A.exp
-  | `IfExpBranchTypesDiffer of A.exp
-  | `IfExpTestNotAnInteger of A.exp
-  | `InvalidOperation of A.exp
-  | `RecordFieldDoesntExist of A.exp
-  | `RecordFieldNamesAndTypesDontMatch of A.exp
-  | `RecordFieldNamesDontMatch of A.exp
-  | `RecordFieldTypesDontMatch of A.exp
-  | `RecordTypeNotFound of A.exp
-  | `RecordTypeNotRecord of A.exp
-  | `SubscriptMustBeInteger of A.exp
-  | `SubscriptNonArrayAndNonIntegerIndex of A.exp
-  | `UnexpectedNumberOfArguments of A.exp
-  | `VariableNotFound of A.exp
-  | `WhileBodyNotUnit of A.exp
-  | `WhileTestAndBodyWrongType of A.exp
-  | `WhileTestNotInt of A.exp
-  | `WrongNumberOfFields of A.exp ] [@@deriving show]
+let sequence_results results =
+  let rec aux acc = function
+    | [] -> Ok (List.rev acc)
+    | Ok x :: xs -> aux (x :: acc) xs
+    | Error e :: _ -> Error e
+  in
+  aux [] results
 
+type typecheck_err = [ `ArrayNotTypeArray of A.exp
+ | `ArraySizeNotInteger of A.exp
+ | `ArrayTypeNotFound of A.exp
+ | `ArrayTypeTranslationNotFound of string * A.pos
+ | `AssignmentTypesDontmatch of A.exp
+ | `CantAccessFieldOfNonRecordVariable of A.exp
+ | `CantAccessSubscriptOfNonArrayVariable of A.exp
+ | `CantReassignForLoopVariable of A.exp
+ | `ExpectedFunctionFoundVar of A.exp
+ | `ExpectedVariableGotFunction of A.exp
+ | `ForLoopBodyReturnsValue of A.exp
+ | `ForLoopIndexesNotIntegers of A.exp
+ | `FunctionArgumentWrongType of A.exp
+ | `FunctionNotFound of A.exp
+ | `FunctionResultAnnotationNotFound of A.pos
+ | `FunctionTypeAnnotationDoesntMatchExpression of A.pos
+ | `IfExpBranchTypesDiffer of A.exp
+ | `IfExpTestNotAnInteger of A.exp
+ | `InvalidOperation of A.exp
+ | `NameTypeTranslationNotFound of string * A.pos
+ | `RecordFieldDoesntExist of A.exp
+ | `RecordFieldNamesAndTypesDontMatch of A.exp
+ | `RecordFieldNamesDontMatch of A.exp
+ | `RecordFieldTypesDontMatch of A.exp
+ | `RecordTypeNotFound of A.exp
+ | `RecordTypeNotRecord of A.exp
+ | `RecordTypeTranslatinoNotFound of string
+ | `SubscriptMustBeInteger of A.exp
+ | `SubscriptNonArrayAndNonIntegerIndex of A.exp
+ | `UnexpectedNumberOfArguments of A.exp
+ | `UnknownFunctionDecArgType
+ | `VariableNotFound of A.exp
+ | `VariableTypeAnnotationDoesntMatchExpression of A.pos
+ | `VariableTypeAnnotationNotFound of A.pos
+ | `WhileBodyNotUnit of A.exp
+ | `WhileTestAndBodyWrongType of A.exp
+ | `WhileTestNotInt of A.exp
+ | `WrongNumberOfFields of A.exp ] [@@deriving show]
 
 (*
   typecheck takes a abstract syntx node, validates its type, and
   then reconstructs it with an annotation for the type
 *)
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
-    (p : A.exp): ((A.exp * T.ty), typecheck_error) result =
+    (p : A.exp) =
   let checkexp = typecheck vars types in
   let is_eq_or_neq = function A.EqOp | A.NeqOp -> true | _ -> false in
   let assigned_in exp' v = false in
+  let type_of_abstract_type tenv (typ : A.ty) =
+    match typ with
+    | A.NameTy (s, pos) -> (
+        match S.look (S.symbol s) tenv with
+        | Some t -> Ok t
+        | None -> Error (`NameTypeTranslationNotFound (s, pos)))
+    | A.ArrayTy (s, pos) -> (
+        match S.look (S.symbol s) tenv with
+        | Some t -> Ok (T.ARRAY (t, ref ()))
+        | None -> Error (`ArrayTypeTranslationNotFound (s, pos)))
+    | A.RecordTy fields ->
+        let trans_field (f : A.field) =
+          match S.look (S.symbol f.typ) tenv with
+          | Some t -> Ok (S.symbol f.name, t)
+          | None -> Error (`RecordTypeTranslatinoNotFound f.name)
+        in
+
+        let* internal_fields =
+          List.map trans_field fields |> sequence_results
+        in
+        Ok (T.RECORD (internal_fields, ref ()))
+  in
+
   let rec actual_ty = function
     | T.NAME (_, { contents = Some real_type }) -> actual_ty real_type
     | t -> t
@@ -159,6 +197,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.BreakExp _ as z -> Ok (z, T.UNIT)
   | A.ArrayExp { typ; size; init; pos } as z -> (
       (* check that the underlying type matches initializer  and that size is an integer (do I need ref?) *)
+      (* print_endline @@ Env.show_tenv types; *)
       let* _, init_ty = checkexp init in
       let* _, size_ty = checkexp size in
       let* found_type =
@@ -213,14 +252,85 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
       | _, _, _ -> Error (`ForLoopBodyReturnsValue z))
   | A.LetExp { decs; body; _ } as z ->
-      let new_vars, new_types =
-        decs
-        |> (flip List.fold_left) (vars, types) (fun acc dec ->
-               match dec with
-               | A.FunctionDec fundecs -> acc
-               | A.VarDec { name; escape; typ; init; pos } -> acc
-               | A.TypeDec tydecs -> acc)
+      let checkdec vars types = function
+        | A.TypeDec tydecs ->
+            print_endline "td";
+            let check_typedecs ty_env = function
+              | [] -> Ok ty_env
+              | (d : A.typedec) :: ds ->
+                  let* resolved_type = type_of_abstract_type ty_env d.ty in
+                  let new_types =
+                    S.enter (S.symbol d.name) resolved_type ty_env
+                  in
+                  Ok new_types
+            in
+            let* (new_types : Env.ty Symbol.table) =
+              check_typedecs types tydecs
+            in
+            Ok (vars, new_types)
+        | A.VarDec { name; escape; typ; init; pos } ->
+          print_endline "vd";
+            let* _, init_ty = typecheck vars types init in
+            let* var_ty =
+              match typ with
+              | None -> Ok init_ty
+              | Some (s, pos) -> (
+                  match S.look (S.symbol s) types with
+                  | None -> Error (`VariableTypeAnnotationNotFound pos)
+                  | Some t when t <> init_ty ->
+                      Error (`VariableTypeAnnotationDoesntMatchExpression pos)
+                  | Some t -> Ok t)
+            in
+
+            let new_vars =
+              S.enter (S.symbol name) (Env.VarEntry { ty = var_ty }) vars
+            in
+            Ok (new_vars, types)
+        | A.FunctionDec fundecs ->
+            let check_fundecs var_env = function
+              | [] -> Ok var_env
+              | A.{ name; params; result; body; _ } :: ds ->
+                  let* formals =
+                    params
+                    |> List.map (fun (f : A.field) ->
+                           S.look (S.symbol f.typ) types
+                           |> Option.to_result ~none:`UnknownFunctionDecArgType)
+                    |> sequence_results
+                  in
+                  let* _, body_ty = typecheck var_env types body in
+                  let* result_ty =
+                    match result with
+                    | None -> Ok body_ty
+                    | Some (s, pos) -> (
+                        match S.look (S.symbol s) types with
+                        | None -> Error (`FunctionResultAnnotationNotFound pos)
+                        | Some t when t <> body_ty->
+                            Error
+                              (`FunctionTypeAnnotationDoesntMatchExpression pos)
+                        | Some t -> Ok t)
+                  in
+
+                  let fe = Env.FunEntry { formals; result=result_ty } in
+                  let new_vars =
+                    S.enter (S.symbol name) fe vars
+                  in
+
+                  Ok new_vars
+            in
+            Ok (vars, types)
       in
+
+      let rec checkdecs vars types = function
+        | [] -> Ok (vars, types)
+        | d :: ds ->
+            let* new_vars, new_types = checkdec vars types d in
+
+            print_endline @@ Env.show_tenv new_types;
+            print_endline @@ Env.show_venv new_vars;
+            checkdecs new_vars new_types ds
+      in
+
+      let* new_vars, new_types = checkdecs vars types decs in
       let* _, body_type = typecheck new_vars new_types body in
       Ok (z, body_type)
 
@@ -248,14 +358,10 @@ let translate vars types (p : Absyn.exp) =
 
 let typecheckProg' (p : Absyn.exp) =
   let vars = Symbol.empty in
-  let types = Symbol.empty in
-
+  let types = Symbol.empty |> Symbol.enter (Symbol.symbol "int") T.INT |> Symbol.enter (Symbol.symbol "string") T.STRING  in
   let* typechecked, _type = typecheck vars types p in
   Ok ()
 
 let typecheckProg p =
   let res = typecheckProg' p in
-  match res with
-  | Ok v -> ()
-  | Error e -> print_endline @@ show_typecheck_error e
-
+  match res with Ok v -> () | Error e -> print_endline @@ show_typecheck_err e

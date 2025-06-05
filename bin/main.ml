@@ -23,14 +23,14 @@ let () =
 
   let progs =
     [
-      (* "/Users/brodylittle/Git/tigml/test/test1.tig"; *)
+      "/Users/brodylittle/Git/tigml/test/test1.tig";
       (* "/Users/brodylittle/Git/tigml/test/test2.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test3.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test4.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test5.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test6.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test7.tig"; *)
-      "/Users/brodylittle/Git/tigml/test/test8.tig";
+      (* "/Users/brodylittle/Git/tigml/test/test8.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test9.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test10.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test11.tig"; *)

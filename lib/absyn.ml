@@ -1,10 +1,13 @@
 type pos = Lexing.position
 type symbol = string [@@deriving show]
 
-
-let pp_pos _ (p : pos) =
+let pp_pos fmt (p : pos) =
   let column = p.pos_cnum - p.pos_bol in
-  Printf.printf "position line:%i column:%i\n" p.pos_lnum column
+  Format.fprintf fmt "line:%i column:%i" p.pos_lnum column
+
+(* Add this line to make ppx_deriving aware of the printer *)
+let show_pos p = Format.asprintf "%a" pp_pos p
+
 
 type oper =
   | PlusOp
