@@ -11,10 +11,15 @@ let ( let$ ) = Option.bind
   typecheck takes a abstract syntx node, validates its type, and
   then reconstructs it with an annotation for the type
 *)
-let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
+let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     (p : A.exp) =
   let checkexp = typecheck vars types in
   let is_eq_or_neq = function A.EqOp | A.NeqOp -> true | _ -> false in
+  let rec actual_ty = function
+    | T.NAME (_, { contents = Some real_type }) -> actual_ty real_type
+    | t -> t
+  in
+
   let both_ints_or_strings = function
     | T.INT, T.INT | T.STRING, T.STRING -> true
     | _ -> false
@@ -82,7 +87,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
             | [], _ | _, [] -> Error `UnexpectedNumberOfArguments
           in
           check_args formals args)
-  | A.RecordExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.SeqExp exps as z -> (
       (* A sequence's type is the last type in the list, or unit if it is empty *)
       match List.nth_opt (List.rev exps) 0 with
@@ -98,11 +102,29 @@ let rec typecheck (vars : Env.enventry S.table) (types : Env.enventry S.table)
       | _, T.UNIT -> Error (`WhileTestNotInt z)
       | T.INT, _ -> Error (`WhileBodyNotUnit z)
       | _, _ -> Error (`WhileTestAndBodyWrongType z))
+  | A.BreakExp _ as z -> Ok (z, T.UNIT)
+  | A.ArrayExp { typ; size; init; pos } as z -> (
+      (* check that the underlying type matches initializer  and that size is an integer (do I need ref?) *)
+      let* _, init_ty = checkexp init in
+      let* _, size_ty = checkexp size in
+      let* found_type =
+        S.look (S.symbol typ) types
+        |> Option.to_result ~none:(`ArrayTypeNotFound z)
+      in
+      match (size_ty, actual_ty found_type) with
+      | (T.INT, T.ARRAY (item_type, _)) as resolved_types
+        when item_type = init_ty ->
+          Ok (z, snd resolved_types)
+      | T.INT, _ -> Error (`ArrayNotTypeArray z)
+      | _, _ -> Error `ArraySizeNotInteger)
+  | A.RecordExp { fields; typ; pos } as z ->
+      let* _found_type =
+        S.look (S.symbol typ) types |> Option.to_result ~none:`Unfound
+      in
+      Error (`UnimplementedTypechecking z)
   | A.AssignExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.ForExp _ as z -> Error (`UnimplementedTypechecking z)
-  | A.BreakExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.LetExp _ as z -> Error (`UnimplementedTypechecking z)
-  | A.ArrayExp _ as z -> Error (`UnimplementedTypechecking z)
 
 (*
   translate takes a type annotated syntax node and generates

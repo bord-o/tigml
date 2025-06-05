@@ -1,6 +1,7 @@
 type pos = Lexing.position
 type symbol = string [@@deriving show]
 
+
 let pp_pos _ (p : pos) =
   let _column = p.pos_cnum - p.pos_bol in
   (* Printf.printf "position %i:%i\n" p.pos_lnum column *)
@@ -17,13 +18,13 @@ type oper =
   | LeOp
   | GtOp
   | GeOp
-[@@deriving show]
+[@@deriving show, map]
 
 type var =
   | SimpleVar of symbol * pos
   | FieldVar of var * symbol * pos
   | SubscriptVar of var * exp * pos
-[@@deriving show]
+[@@deriving show, map]
 
 and exp =
   | VarExp of var
@@ -77,3 +78,4 @@ and ty =
   | RecordTy of field list
   | ArrayTy of symbol * pos
 [@@deriving show]
+
