@@ -3,9 +3,8 @@ type symbol = string [@@deriving show]
 
 
 let pp_pos _ (p : pos) =
-  let _column = p.pos_cnum - p.pos_bol in
-  (* Printf.printf "position %i:%i\n" p.pos_lnum column *)
-  ()
+  let column = p.pos_cnum - p.pos_bol in
+  Printf.printf "position line:%i column:%i\n" p.pos_lnum column
 
 type oper =
   | PlusOp
