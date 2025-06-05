@@ -248,7 +248,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       let* _, body_type = typecheck new_vars types body in
 
-      match (body_type, lo_type, hi_type) with
+      match (lo_type, hi_type, body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var -> Ok (z, T.UNIT)
       | T.INT, T.INT, T.UNIT -> Error (`CantReassignForLoopVariable z)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
@@ -301,7 +301,12 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                            |> Option.to_result ~none:`UnknownFunctionDecArgType)
                     |> sequence_results
                   in
-                  let* _, body_ty = typecheck var_env types body in
+                  let bound_args = List.fold_left2 (fun body_vars ty (field : A.field) ->
+                    let ve = Env.VarEntry { ty } in
+                    S.enter (S.symbol field.name) ve body_vars
+                  ) var_env formals params in
+
+                  let* _, body_ty = typecheck bound_args types body in
                   let* result_ty =
                     match result with
                     | None -> Ok body_ty
