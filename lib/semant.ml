@@ -64,20 +64,25 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   let checkexp = typecheck vars types in
   let is_eq_or_neq = function A.EqOp | A.NeqOp -> true | _ -> false in
   let assigned_in exp' v = false in
+  let rec actual_ty = function
+    | T.NAME (_, { contents = Some real_type }) -> actual_ty real_type
+    | t -> t
+  in
   let type_of_abstract_type tenv (typ : A.ty) =
     match typ with
     | A.NameTy (s, pos) -> (
         match S.look (S.symbol s) tenv with
-        | Some t -> Ok t
+        | Some t -> Ok (actual_ty t)
         | None -> Error (`NameTypeTranslationNotFound (s, pos)))
     | A.ArrayTy (s, pos) -> (
+        (* print_endline @@ Env.show_tenv tenv; *)
         match S.look (S.symbol s) tenv with
-        | Some t -> Ok (T.ARRAY (t, ref ()))
+        | Some t -> Ok (T.ARRAY (actual_ty t, ref ()))
         | None -> Error (`ArrayTypeTranslationNotFound (s, pos)))
     | A.RecordTy fields ->
         let trans_field (f : A.field) =
           match S.look (S.symbol f.typ) tenv with
-          | Some t -> Ok (S.symbol f.name, t)
+          | Some t -> Ok (S.symbol f.name, actual_ty t)
           | None -> Error (`RecordTypeTranslatinoNotFound f.name)
         in
 
@@ -87,10 +92,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         Ok (T.RECORD (internal_fields, ref ()))
   in
 
-  let rec actual_ty = function
-    | T.NAME (_, { contents = Some real_type }) -> actual_ty real_type
-    | t -> t
-  in
 
   let both_ints_or_strings = function
     | T.INT, T.INT | T.STRING, T.STRING -> true
@@ -255,14 +256,16 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let checkdec vars types = function
         | A.TypeDec tydecs ->
             print_endline "td";
-            let check_typedecs ty_env = function
+            let rec check_typedecs ty_env = function
               | [] -> Ok ty_env
               | (d : A.typedec) :: ds ->
                   let* resolved_type = type_of_abstract_type ty_env d.ty in
                   let new_types =
                     S.enter (S.symbol d.name) resolved_type ty_env
                   in
-                  Ok new_types
+
+                  (* print_endline @@ Env.show_tenv new_types; *)
+                  check_typedecs new_types ds
             in
             let* (new_types : Env.ty Symbol.table) =
               check_typedecs types tydecs
