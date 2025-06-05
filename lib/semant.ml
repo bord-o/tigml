@@ -117,11 +117,30 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           Ok (z, snd resolved_types)
       | T.INT, _ -> Error (`ArrayNotTypeArray z)
       | _, _ -> Error `ArraySizeNotInteger)
-  | A.RecordExp { fields; typ; pos } as z ->
-      let* _found_type =
-        S.look (S.symbol typ) types |> Option.to_result ~none:`Unfound
+  | A.RecordExp { fields; typ; pos } as z -> (
+      let* found_type =
+        S.look (S.symbol typ) types
+        |> Option.to_result ~none:(`RecordTypeNotFound z)
       in
-      Error (`UnimplementedTypechecking z)
+      match actual_ty found_type with
+      | T.RECORD (found_fields, r) ->
+          let rec check_fields = function
+            | [], [] -> Ok (z, found_type)
+            | _v, [] -> Error (`WrongNumberOfFields z)
+            | [], _v -> Error (`WrongNumberOfFields z)
+            | (name', exp', _ ):: ls, (r_sym, r_ty) :: rs ->
+
+              let l_sym= S.symbol name' in
+              let* (_, l_ty) = checkexp exp' in
+              match (l_sym = r_sym, l_ty = r_ty) with
+              | true, true -> check_fields (ls, rs)
+              | false, true -> Error (`RecordFieldNamesDontMatch)
+              | true, false -> Error (`RecordFieldTypesDontMatch)
+              | false, false -> Error (`RecordFieldNamesAndTypesDontMatch)
+          in
+          check_fields (fields, found_fields)
+
+      | _ -> Error (`RecordTypeNotRecord z))
   | A.AssignExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.ForExp _ as z -> Error (`UnimplementedTypechecking z)
   | A.LetExp _ as z -> Error (`UnimplementedTypechecking z)
