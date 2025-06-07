@@ -122,7 +122,7 @@ rule token = parse
     {pp "TIMES"; TIMES}
 
 | '/'
-    {print_endline "DIVIDE"; DIVIDE}
+    {pp "DIVIDE"; DIVIDE}
 
 | "-"
     {pp "MINUS"; MINUS}
