@@ -243,8 +243,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match (size_ty, actual_ty found_type) with
       | (T.INT, T.ARRAY (item_type, _)) as resolved_types
-        when item_type =~ init_ty
-             || match init_ty with T.NIL -> true | _ -> false ->
+        when item_type =~ init_ty ->
           Ok (z, snd resolved_types)
       | T.INT, _ -> Error (`ArrayNotTypeArray z)
       | _, _ -> Error (`ArraySizeNotInteger z))
@@ -282,7 +281,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.AssignExp { var; exp; _ } as z ->
       let* _, var_type = checkexp (A.VarExp var) in
       let* _, exp_type = checkexp exp in
-      if var_type =~ exp_type then Ok (z, T.UNIT)
+      if
+        var_type =~ exp_type || match exp_type with T.NIL -> true | _ -> false
+      then Ok (z, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
       let* _, lo_type = checkexp lo in
