@@ -5,7 +5,6 @@ module S = Symbol
 module A = Absyn
 module T = Types
 
-
 let ( let* ) = Result.bind
 
 let sequence_results results =
@@ -75,7 +74,7 @@ let actual_ty start_type =
           actual_ty_helper ((sym, current_type) :: seen_types) real_type
     | t -> t
   in
-  actual_ty_helper [] start_type 
+  actual_ty_helper [] start_type
 
 let types_equal t1 t2 =
   let equal_helper t1 t2 =
@@ -86,17 +85,17 @@ let types_equal t1 t2 =
     | T.NIL, T.NIL -> true
     | T.RECORD (_fields1, unique1), T.RECORD (_fields2, unique2) ->
         (* Records are equal if they're from the same type declaration *)
-        unique1 == unique2  (* Physical equality of the unique refs *)
+        unique1 == unique2 (* Physical equality of the unique refs *)
     | T.ARRAY (_elem1, unique1), T.ARRAY (_elem2, unique2) ->
         (* Arrays are equal if they're from the same type declaration *)
-        unique1 == unique2  (* Physical equality of the unique refs *)
-    | T.NAME (sym1, _), T.NAME (sym2, _) ->
-        compare sym1 sym2 = 0
+        unique1 == unique2 (* Physical equality of the unique refs *)
+    | T.NAME (sym1, _), T.NAME (sym2, _) -> compare sym1 sym2 = 0
     | _ -> false
   in
   equal_helper t1 t2
-let (=~) = types_equal
-let (<>~) = fun l r -> not @@ types_equal l r
+
+let ( =~ ) = types_equal
+let ( <>~ ) = fun l r -> not @@ types_equal l r
 
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     (p : A.exp) =
@@ -179,7 +178,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | T.RECORD _, o, T.RECORD _ when is_eq_or_neq o -> Ok (z, T.INT)
       | T.RECORD _, o, T.NIL when is_eq_or_neq o -> Ok (z, T.INT)
       | T.NIL, o, T.RECORD _ when is_eq_or_neq o -> Ok (z, T.INT)
-      | l, _o, r when  l =~ r -> Ok (z, l)
+      | l, _o, r when l =~ r -> Ok (z, l)
       (* Comparison operators work on ints and strings *)
       | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
       | l, A.LeOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
@@ -209,7 +208,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], [] -> Ok (z, result)
             | e :: exps, g :: gots ->
                 let* _, got_type = checkexp g in
-                if  e =~ got_type then check_args exps gots
+                if e =~ got_type then check_args exps gots
                 else Error (`FunctionArgumentWrongType z)
             | [], _ | _, [] -> Error (`UnexpectedNumberOfArguments z)
           in
@@ -259,7 +258,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
                 let* _, l_ty = checkexp exp' in
-                match (l_sym = r_sym,  l_ty =~ r_ty) with
+                match (l_sym = r_sym, l_ty =~ r_ty) with
                 | true, true -> check_fields (ls, rs)
                 | false, true -> Error (`RecordFieldNamesDontMatch z)
                 | true, false -> Error (`RecordFieldTypesDontMatch z)
@@ -270,7 +269,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.AssignExp { var; exp; _ } as z ->
       let* _, var_type = checkexp (A.VarExp var) in
       let* _, exp_type = checkexp exp in
-      if  var_type =~ exp_type then Ok (z, T.UNIT)
+      if var_type =~ exp_type then Ok (z, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
       let* _, lo_type = checkexp lo in
@@ -324,43 +323,65 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             Ok (new_vars, types)
         | A.FunctionDec fundecs ->
-            let rec check_fundecs var_env = function
-              | [] -> Ok var_env
-              | A.{ name; params; result; body; _ } :: ds ->
-                  let* formals =
-                    params
-                    |> List.map (fun (f : A.field) ->
-                           S.look (S.symbol f.typ) types
-                           |> Option.to_result ~none:`UnknownFunctionDecArgType)
-                    |> sequence_results
-                  in
-                  let bound_args =
-                    List.fold_left2
-                      (fun body_vars ty (field : A.field) ->
-                        let ve = Env.VarEntry { ty } in
-                        S.enter (S.symbol field.name) ve body_vars)
-                      var_env formals params
-                  in
-
-                  let* _, body_ty = typecheck bound_args types body in
-                  let* result_ty =
-                    match result with
-                    | None -> Ok body_ty
-                    | Some (s, pos) -> (
-                        match S.look (S.symbol s) types with
-                        | None -> Error (`FunctionResultAnnotationNotFound pos)
-                        | Some t when  t <>~ body_ty ->
-                            Error
-                              (`FunctionTypeAnnotationDoesntMatchExpression pos)
-                        | Some t -> Ok t)
-                  in
-
-                  let fe = Env.FunEntry { formals; result = result_ty } in
-                  let new_vars = S.enter (S.symbol name) fe vars in
-                  check_fundecs new_vars ds
+            let extract_formals params =
+              params
+              |> List.map (fun (f : A.field) ->
+                     S.look (S.symbol f.typ) types
+                     |> Option.to_result ~none:`UnknownFunctionDecArgType)
+              |> sequence_results
             in
-            let* new_vars = check_fundecs vars fundecs in
-            Ok (new_vars, types)
+
+            let extract_result_type result =
+              match result with
+              | None -> Ok T.UNIT 
+              | Some (s, pos) -> (
+                  match S.look (S.symbol s) types with
+                  | None -> Error (`FunctionResultAnnotationNotFound pos)
+                  | Some t -> Ok t)
+            in
+
+            let add_function_header vars fundec =
+              let A.{ name; params; result; _ } = fundec in
+              let* formals = extract_formals params in
+              let* result_ty = extract_result_type result in
+              let fe = Env.FunEntry { formals; result = result_ty } in
+              Ok (S.enter (S.symbol name) fe vars)
+            in
+
+            let* vars_with_headers =
+              List.fold_left
+                (fun acc_result fundec ->
+                  let* acc_vars = acc_result in
+                  add_function_header acc_vars fundec)
+                (Ok vars) fundecs
+            in
+
+            let check_function_body fundec =
+              let A.{ name = _; params; result; body; _ } = fundec in
+              let* formals = extract_formals params in
+              let* expected_result_ty = extract_result_type result in
+
+              let bound_args =
+                List.fold_left2
+                  (fun body_vars ty (field : A.field) ->
+                    let ve = Env.VarEntry { ty } in
+                    S.enter (S.symbol field.name) ve body_vars)
+                  vars_with_headers formals params
+              in
+
+              let* _, actual_body_ty = typecheck bound_args types body in
+
+              
+              if types_equal actual_body_ty expected_result_ty then Ok ()
+              else
+                Error (`FunctionTypeAnnotationDoesntMatchExpression fundec.pos)
+            in
+
+            let* _ =
+              fundecs |> List.map check_function_body |> sequence_results
+            in
+
+            Ok (vars_with_headers, types)
       in
 
       let rec checkdecs vars types = function
@@ -393,4 +414,6 @@ let typecheckProg' (p : Absyn.exp) =
 
 let typecheckProg p =
   let res = typecheckProg' p in
-  match res with Ok _v -> () | Error e -> print_endline @@ show_typecheck_err e
+  match res with
+  | Ok _v -> ()
+  | Error e -> print_endline @@ show_typecheck_err e
