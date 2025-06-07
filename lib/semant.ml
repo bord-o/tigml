@@ -243,7 +243,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match (size_ty, actual_ty found_type) with
       | (T.INT, T.ARRAY (item_type, _)) as resolved_types
-        when item_type =~ init_ty ->
+        when item_type =~ init_ty
+             || match init_ty with T.NIL -> true | _ -> false ->
           Ok (z, snd resolved_types)
       | T.INT, _ -> Error (`ArrayNotTypeArray z)
       | _, _ -> Error (`ArraySizeNotInteger z))
