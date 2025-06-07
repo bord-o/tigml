@@ -1,20 +1,10 @@
 (* [@@@warning "-27"] *)
 (* [@@@warning "-26"] *)
 
+open Util
 module S = Symbol
 module A = Absyn
 module T = Types
-
-let ( let* ) = Result.bind
-
-let sequence_results results =
-  let rec aux acc x =
-    match x with
-    | [] -> Ok (List.rev acc)
-    | Ok x :: xs -> aux (x :: acc) xs
-    | Error e :: _ -> Error e
-  in
-  aux [] results
 
 type typecheck_err =
   [ `ArrayNotTypeArray of A.exp
@@ -33,7 +23,7 @@ type typecheck_err =
   | `FunctionArgumentWrongType of A.exp
   | `FunctionNotFound of A.exp
   | `FunctionResultAnnotationNotFound of A.pos
-  | `FunctionTypeAnnotationDoesntMatchExpression of A.pos
+  | `FunctionTypeAnnotationDoesntMatchExpression of A.exp
   | `IfExpBranchTypesDiffer of A.exp
   | `IfExpTestNotAnInteger of A.exp
   | `InvalidOperation of A.exp
@@ -58,55 +48,37 @@ type typecheck_err =
   | `WrongNumberOfFields of A.exp ]
 [@@deriving show]
 
-(* TODO: make sure I'm using actual_ty appropriately everywhere *)
-let actual_ty = T.actual_ty
-
-let nullable_reference_types_eq t1 t2 =
-  match (t1, t2) with
-  | T.RECORD _, T.NIL -> true
-  | T.ARRAY _, T.NIL -> true
-  | T.NIL, T.RECORD _ -> true
-  | T.NIL, T.ARRAY _ -> true
-  | _ -> false
-
-let types_equal t1 t2 =
-  let t1, t2 = actual_ty t1,actual_ty t2 in
-  match (actual_ty t1, actual_ty t2) with
-  | T.INT, T.INT -> true
-  | T.STRING, T.STRING -> true
-  | T.UNIT, T.UNIT -> true
-  | T.NIL, T.NIL -> true
-  | T.RECORD (_fields1, unique1), T.RECORD (_fields2, unique2) ->
-      unique1 == unique2 
-  | T.ARRAY (_elem1, unique1), T.ARRAY (_elem2, unique2) ->
-      unique1 == unique2 
-  | T.NAME (sym1, _), T.NAME (sym2, _) -> compare sym1 sym2 = 0
-  | _ -> false
-
-let ( ==~ ) = types_equal
-let ( =~ ) = fun l r -> types_equal l r || nullable_reference_types_eq (actual_ty l) (actual_ty r)
-let ( <>~ ) = fun l r -> not @@ types_equal l r
+(* TODO: make sure I'm using resolv appropriately everywhere *)
+let resolv = T.actual_ty
+let nullable = T.nullable_reference_types_eq
+let ty_eq = T.types_equal
+let both_ints_or_strings = T.both_ints_or_strings
+let is_eq_neq_op = function A.EqOp | A.NeqOp -> true | _ -> false
+let ( ==~ ) = ty_eq
+let ( =~ ) = fun l r -> ty_eq l r || nullable (resolv l) (resolv r)
+let ( <>~ ) = fun l r -> not @@ ty_eq l r
+let ( let* ) = Result.bind
 
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     (p : A.exp) =
   let checkexp = typecheck vars types in
-  let is_eq_or_neq = function A.EqOp | A.NeqOp -> true | _ -> false in
+  (* TODO: finish this *)
   let assigned_in _exp' _v = false in
   let type_of_abstract_type tenv (typ : A.ty) =
     match typ with
     | A.NameTy (s, pos) -> (
         match S.look (S.symbol s) tenv with
-        | Some t -> Ok (actual_ty t)
+        | Some t -> Ok (resolv t)
         | None -> Error (`NameTypeTranslationNotFound (s, pos)))
     | A.ArrayTy (s, pos) -> (
         (* print_endline @@ Env.show_tenv tenv; *)
         match S.look (S.symbol s) tenv with
-        | Some t -> Ok (T.ARRAY (actual_ty t, ref ()))
+        | Some t -> Ok (T.ARRAY (resolv t, ref ()))
         | None -> Error (`ArrayTypeTranslationNotFound (s, pos)))
     | A.RecordTy fields ->
         let trans_field (f : A.field) =
           match S.look (S.symbol f.typ) tenv with
-          | Some t -> Ok (S.symbol f.name, actual_ty t)
+          | Some t -> Ok (S.symbol f.name, resolv t)
           | None -> Error (`RecordTypeTranslatinoNotFound f.name)
         in
 
@@ -116,10 +88,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         Ok (T.RECORD (internal_fields, ref ()))
   in
 
-  let both_ints_or_strings = function
-    | T.INT, T.INT | T.STRING, T.STRING -> true
-    | _ -> false
-  in
   match p with
   | A.VarExp (A.SimpleVar (name, _)) as z -> (
       let* found_var =
@@ -131,7 +99,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | Env.VarEntry v -> Ok (z, v.ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
       let* _, record_type = checkexp (A.VarExp var) in
-      match actual_ty record_type with
+      match resolv record_type with
       | T.RECORD (fields, _r) ->
           let* field_ty =
             fields
@@ -143,20 +111,19 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
       let* _, array_type = checkexp (A.VarExp var) in
       let* _, index_type = checkexp exp' in
-      match (actual_ty array_type, actual_ty index_type) with
+      match (resolv array_type, resolv index_type) with
       | T.ARRAY (under_type, _r), T.INT -> Ok (z, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
       | T.ARRAY _, _ -> Error (`SubscriptMustBeInteger z)
       | _ -> Error (`SubscriptNonArrayAndNonIntegerIndex z))
-  | A.NilExp as z ->
-      Ok (z, Types.NIL)
+  | A.NilExp as z -> Ok (z, Types.NIL)
   | A.IntExp _ as z -> Ok (z, Types.INT)
   | A.StringExp (_, _) as z -> Ok (z, Types.STRING)
   | A.OpExp oper as z -> (
       let op = oper.oper in
       let* _, left = checkexp oper.left in
       let* _, right = checkexp oper.right in
-      let left, right = (actual_ty left, actual_ty right) in
+      let left, right = (resolv left, resolv right) in
       match (left, op, right) with
       (* Normal operators are normal *)
       | T.INT, A.PlusOp, T.INT -> Ok (z, T.INT)
@@ -164,10 +131,10 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | T.INT, A.TimesOp, T.INT -> Ok (z, T.INT)
       | T.INT, A.DivideOp, T.INT -> Ok (z, T.INT)
       (* Equality and non-equality have a special case for records but otherwise just ensure matching types *)
-      | T.RECORD _, o, T.RECORD _ when is_eq_or_neq o -> Ok (z, T.INT)
-      | T.RECORD _, o, T.NIL when is_eq_or_neq o -> Ok (z, T.INT)
-      | T.NIL, o, T.RECORD _ when is_eq_or_neq o -> Ok (z, T.INT)
-      | l, o, r when l ==~ r && is_eq_or_neq o -> Ok (z, T.INT)
+      | T.RECORD _, o, T.RECORD _ when is_eq_neq_op o -> Ok (z, T.INT)
+      | T.RECORD _, o, T.NIL when is_eq_neq_op o -> Ok (z, T.INT)
+      | T.NIL, o, T.RECORD _ when is_eq_neq_op o -> Ok (z, T.INT)
+      | l, o, r when l ==~ r && is_eq_neq_op o -> Ok (z, T.INT)
       | l, _o, r when l ==~ r -> Ok (z, l)
       (* Comparison operators work on ints and strings *)
       | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
@@ -184,9 +151,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         match else' with
         | Some e ->
             let* _, else_ty = checkexp e in
-            if
-              then_ty =~ else_ty
-            then Ok (z, then_ty)
+            if then_ty =~ else_ty then Ok (z, then_ty)
             else Error (`IfExpBranchTypesDiffer z)
         | None -> Ok (z, then_ty))
   | A.CallExp { func; args; pos = _ } as z -> (
@@ -226,7 +191,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         S.look (S.symbol typ) types
         |> Option.to_result ~none:(`ArrayTypeNotFound z)
       in
-      match (size_ty, actual_ty found_type) with
+      match (size_ty, resolv found_type) with
       | (T.INT, T.ARRAY (item_type, _)) as resolved_types
         when item_type ==~ init_ty ->
           Ok (z, snd resolved_types)
@@ -237,7 +202,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         S.look (S.symbol typ) types
         |> Option.to_result ~none:(`RecordTypeNotFound z)
       in
-      match actual_ty found_type with
+      match resolv found_type with
       | T.RECORD (found_fields, _r) ->
           let rec check_fields = function
             | [], [] -> Ok (z, found_type)
@@ -246,9 +211,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
                 let* _, l_ty = checkexp exp' in
-                let types_compatible l_ty r_ty =
-                  l_ty =~ r_ty
-                in
+                let types_compatible l_ty r_ty = l_ty =~ r_ty in
                 match (l_sym = r_sym, types_compatible l_ty r_ty) with
                 | true, true -> check_fields (ls, rs)
                 | false, true -> Error (`RecordFieldNamesDontMatch z)
@@ -261,7 +224,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* _, var_type = checkexp (A.VarExp var) in
       let* _, exp_type = checkexp exp in
       if
-        var_type ==~ exp_type || match exp_type with T.NIL -> true | _ -> false
+        var_type ==~ exp_type
+        || match exp_type with T.NIL -> true | _ -> false
       then Ok (z, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
@@ -273,7 +237,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       let* _, body_type = typecheck new_vars types body in
 
-      match (lo_type, hi_type, body_type) with
+      match (resolv lo_type, resolv hi_type, resolv body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var -> Ok (z, T.UNIT)
       | T.INT, T.INT, T.UNIT -> Error (`CantReassignForLoopVariable z)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
@@ -313,18 +277,15 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             let* _, init_ty = typecheck vars types init in
             let* var_ty =
               match typ with
-              | None when actual_ty init_ty <>~ T.NIL -> Ok init_ty
+              | None when resolv init_ty <>~ T.NIL -> Ok init_ty
               | None -> Error (`CantDeclareNonReferenceVariableNil z)
               | Some (s, pos) -> (
                   match S.look (S.symbol s) types with
                   | None -> Error (`VariableTypeAnnotationNotFound pos)
-                  | Some t
-                    when t =~ init_ty ->
-                      Ok (actual_ty t)
+                  | Some t when t =~ init_ty -> Ok (resolv t)
                   | Some t ->
                       Error (`VariableTypeAnnotationDoesntMatchExpression z))
             in
-
             let new_vars =
               S.enter (S.symbol name) (Env.VarEntry { ty = var_ty }) vars
             in
@@ -377,10 +338,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               in
 
               let* _, actual_body_ty = typecheck bound_args types body in
-
-              if types_equal actual_body_ty expected_result_ty then Ok ()
-              else
-                Error (`FunctionTypeAnnotationDoesntMatchExpression fundec.pos)
+              if ty_eq actual_body_ty expected_result_ty then Ok ()
+              else Error (`FunctionTypeAnnotationDoesntMatchExpression z)
             in
 
             let* _ =
