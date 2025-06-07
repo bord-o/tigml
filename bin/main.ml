@@ -27,7 +27,7 @@ let () =
       (* "/Users/brodylittle/Git/tigml/test/test2.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test3.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test4.tig"; *)
-      (* "/Users/brodylittle/Git/tigml/test/test5.tig"; *)
+      "/Users/brodylittle/Git/tigml/test/test5.tig";
       (* "/Users/brodylittle/Git/tigml/test/test6.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test7.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test8.tig"; *)
@@ -80,7 +80,7 @@ let () =
       (* "/Users/brodylittle/Git/tigml/test/ast4.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/ast5.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/ast5.tig"; *)
-      "/Users/brodylittle/Git/tigml/test/queens.tig";
+      (* "/Users/brodylittle/Git/tigml/test/queens.tig"; *)
     ]
   in
 

@@ -8,7 +8,9 @@ module T = Types
 let ( let* ) = Result.bind
 
 let sequence_results results =
-  let rec aux acc = function
+  let rec aux acc x =
+    (* print_endline "seq"; *)
+    match x with
     | [] -> Ok (List.rev acc)
     | Ok x :: xs -> aux (x :: acc) xs
     | Error e :: _ -> Error e
@@ -65,6 +67,7 @@ let actual_ty start_type =
   let rec actual_ty_helper seen_types current_type =
     match current_type with
     | T.NAME (sym, { contents = Some real_type }) ->
+        print_endline "actual";
         (* Check if we've seen this symbol before (cycle detection) *)
         if List.exists (fun (s, _) -> compare s sym = 0) seen_types then
           (* Cycle detected - return the current type *)
@@ -258,7 +261,16 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
                 let* _, l_ty = checkexp exp' in
-                match (l_sym = r_sym, l_ty =~ r_ty) with
+                let types_compatible l_ty r_ty =
+                  l_ty =~ r_ty
+                  || (l_ty = T.NIL
+                     &&
+                     match actual_ty r_ty with T.RECORD _ -> true | _ -> false)
+                  || r_ty = T.NIL
+                     &&
+                     match actual_ty l_ty with T.RECORD _ -> true | _ -> false
+                in
+                match (l_sym = r_sym, types_compatible l_ty r_ty) with
                 | true, true -> check_fields (ls, rs)
                 | false, true -> Error (`RecordFieldNamesDontMatch z)
                 | true, false -> Error (`RecordFieldTypesDontMatch z)
@@ -289,21 +301,37 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let checkdec vars types = function
         | A.TypeDec tydecs ->
             print_endline "td";
-            let rec check_typedecs ty_env = function
-              | [] -> Ok ty_env
-              | (d : A.typedec) :: ds ->
-                  let* resolved_type = type_of_abstract_type ty_env d.ty in
-                  let new_types =
-                    S.enter (S.symbol d.name) resolved_type ty_env
-                  in
+            let add_type_header ty_env tydec =
+              let A.{ name; ty = _; _ } = tydec in
+              let placeholder = T.NAME (S.symbol name, ref None) in
+              S.enter (S.symbol name) placeholder ty_env
+            in
 
-                  (* print_endline @@ Env.show_tenv new_types; *)
-                  check_typedecs new_types ds
+            let types_with_headers =
+              List.fold_left add_type_header types tydecs
             in
-            let* (new_types : Env.ty Symbol.table) =
-              check_typedecs types tydecs
+
+            let resolve_type_definition ty_env tydec =
+              print_endline "resolving";
+              let A.{ name; ty; _ } = tydec in
+              let* resolved_type = type_of_abstract_type ty_env ty in
+
+              match S.look (S.symbol name) ty_env with
+              | Some (T.NAME (_, placeholder_ref)) ->
+                  placeholder_ref := Some resolved_type;
+                  Ok ()
+              | _ -> failwith "Internal error: placeholder not found"
             in
-            Ok (vars, new_types)
+
+            let* _ =
+              tydecs
+              |> List.map (resolve_type_definition types_with_headers)
+              |> sequence_results
+            in
+
+            print_endline "here!";
+
+            Ok (vars, types_with_headers)
         | A.VarDec { name; escape = _; typ; init; pos = _ } ->
             print_endline "vd";
             let* _, init_ty = typecheck vars types init in
@@ -323,6 +351,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             Ok (new_vars, types)
         | A.FunctionDec fundecs ->
+            print_endline "fd";
             let extract_formals params =
               params
               |> List.map (fun (f : A.field) ->
@@ -333,7 +362,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
             let extract_result_type result =
               match result with
-              | None -> Ok T.UNIT 
+              | None -> Ok T.UNIT
               | Some (s, pos) -> (
                   match S.look (S.symbol s) types with
                   | None -> Error (`FunctionResultAnnotationNotFound pos)
@@ -371,7 +400,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
               let* _, actual_body_ty = typecheck bound_args types body in
 
-              
               if types_equal actual_body_ty expected_result_ty then Ok ()
               else
                 Error (`FunctionTypeAnnotationDoesntMatchExpression fundec.pos)
@@ -387,15 +415,18 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let rec checkdecs vars types = function
         | [] -> Ok (vars, types)
         | d :: ds ->
+            print_endline "start a dec";
             let* new_vars, new_types = checkdec vars types d in
-
-            print_endline @@ Env.show_tenv new_types;
-            print_endline @@ Env.show_venv new_vars;
+            print_endline "done with a dec";
+            (* print_endline @@ Env.show_tenv new_types; *)
+            (* print_endline @@ Env.show_venv new_vars; *)
             checkdecs new_vars new_types ds
       in
 
       let* new_vars, new_types = checkdecs vars types decs in
+      print_endline "Done checkdecs";
       let* _, body_type = typecheck new_vars new_types body in
+      print_endline "Done body check";
       Ok (z, body_type)
 
 let typecheckProg' (p : Absyn.exp) =
