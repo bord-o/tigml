@@ -73,14 +73,14 @@ let () =
       (* "/Users/brodylittle/Git/tigml/test/test47.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test48.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/test49.tig";  this is supposed to syntax error*)
-      (* "/Users/brodylittle/Git/tigml/test/merge.tig"; *)
+      "/Users/brodylittle/Git/tigml/test/merge.tig";
 	  (* "/Users/brodylittle/Git/tigml/test/ast1.tig"; *)
   	  (* "/Users/brodylittle/Git/tigml/test/ast2.tig"; *)
 	  (* "/Users/brodylittle/Git/tigml/test/ast3.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/ast4.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/ast5.tig"; *)
       (* "/Users/brodylittle/Git/tigml/test/ast5.tig"; *)
-      "/Users/brodylittle/Git/tigml/test/queens.tig";
+      (* "/Users/brodylittle/Git/tigml/test/queens.tig"; *)
     ]
   in
 

@@ -1,5 +1,5 @@
-(* [@@@warning "-27"] *)
-(* [@@@warning "-26"] *)
+[@@@warning "-27"]
+[@@@warning "-26"]
 
 module S = Symbol
 module A = Absyn
@@ -301,10 +301,13 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                            |> Option.to_result ~none:`UnknownFunctionDecArgType)
                     |> sequence_results
                   in
-                  let bound_args = List.fold_left2 (fun body_vars ty (field : A.field) ->
-                    let ve = Env.VarEntry { ty } in
-                    S.enter (S.symbol field.name) ve body_vars
-                  ) var_env formals params in
+                  let bound_args =
+                    List.fold_left2
+                      (fun body_vars ty (field : A.field) ->
+                        let ve = Env.VarEntry { ty } in
+                        S.enter (S.symbol field.name) ve body_vars)
+                      var_env formals params
+                  in
 
                   let* _, body_ty = typecheck bound_args types body in
                   let* result_ty =
@@ -344,7 +347,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 let typecheckProg' (p : Absyn.exp) =
   let vars =
     Symbol.empty
-    |> Symbol.enter (Symbol.symbol "print") (Env.FunEntry {formals = [ T.STRING ]; result = T.UNIT })
+    |> Symbol.enter (Symbol.symbol "print")
+         (Env.FunEntry { formals = [ T.STRING ]; result = T.UNIT })
   in
   let types =
     Symbol.empty
