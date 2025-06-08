@@ -21,6 +21,8 @@ type level =
 type access = level * Frame.access [@@deriving show]
 
 let outermost = Outermost
+let outermost_frame = Frame.new_frame (Temp.named_label "main") []
+
 
 let new_level parent name formals =
   let formals_with_link = true :: formals in
@@ -37,7 +39,9 @@ let formals = function
       List.map (fun access -> (level, access)) without_static_link
 
 let alloc_local (escape : bool) = function
-  | Outermost -> failwith "Outermost level has no formals"
+  | Outermost ->
+      let frame_access = Frame.alloc_local outermost_frame escape in
+      (Outermost, frame_access)
   | Level { frame; parent = _; unique = _ } as level ->
       let frame_access = Frame.alloc_local frame escape in
       (level, frame_access)

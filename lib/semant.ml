@@ -430,6 +430,9 @@ exception IDKBro of string
 let typecheckProg p =
   let res = typecheckProg' p in
   match res with
-  | Ok _v -> ()
+  | Ok _v ->
+    print_endline "Ok"
   | Error e -> raise (IDKBro (show_typecheck_err e))
-(* | Error e -> print_endline @@ show_typecheck_err e *)
+  (* | Error e -> *)
+    (* print_endline "error: "; *)
+    (* print_endline @@ show_typecheck_err e *)
