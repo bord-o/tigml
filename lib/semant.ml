@@ -60,8 +60,8 @@ let ( <>~ ) = fun l r -> not @@ ty_eq l r
 let ( let* ) = Result.bind
 
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
-    (p : A.exp) =
-  let checkexp = typecheck vars types in
+    (p : A.exp) (level : Translate.level) =
+  let checkexp p level = typecheck vars types p level in
   (* TODO: finish this *)
   let assigned_in _exp' _v = false in
   let type_of_abstract_type tenv (typ : A.ty) =
@@ -98,7 +98,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
       | Env.VarEntry v -> Ok (z, v.ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
-      let* _, record_type = checkexp (A.VarExp var) in
+      let* _, record_type = checkexp (A.VarExp var) level in
       match resolv record_type with
       | T.RECORD (fields, _r) ->
           let* field_ty =
@@ -109,8 +109,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           Ok (z, field_ty)
       | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
   | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
-      let* _, array_type = checkexp (A.VarExp var) in
-      let* _, index_type = checkexp exp' in
+      let* _, array_type = checkexp (A.VarExp var) level in
+      let* _, index_type = checkexp exp' level in
       match (resolv array_type, resolv index_type) with
       | T.ARRAY (under_type, _r), T.INT -> Ok (z, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
@@ -121,8 +121,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.StringExp (_, _) as z -> Ok (z, Types.STRING)
   | A.OpExp oper as z -> (
       let op = oper.oper in
-      let* _, left = checkexp oper.left in
-      let* _, right = checkexp oper.right in
+      let* _, left = checkexp oper.left level in
+      let* _, right = checkexp oper.right level in
       let left, right = (resolv left, resolv right) in
       match (left, op, right) with
       (* Normal operators are normal *)
@@ -144,13 +144,13 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       (* And and or are short-circuiting and are handled in the parser *)
       | _ -> Error (`InvalidOperation z))
   | A.IfExp { test; then'; else'; pos = _ } as z -> (
-      let* _, test_ty = checkexp test in
+      let* _, test_ty = checkexp test level in
       if test_ty <>~ T.INT then Error (`IfExpTestNotAnInteger z)
       else
-        let* _, then_ty = checkexp then' in
+        let* _, then_ty = checkexp then' level in
         match else' with
         | Some e ->
-            let* _, else_ty = checkexp e in
+            let* _, else_ty = checkexp e level in
             if then_ty =~ else_ty then Ok (z, then_ty)
             else Error (`IfExpBranchTypesDiffer z)
         | None -> Ok (z, then_ty))
@@ -158,12 +158,12 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
       | Some (VarEntry _) -> Error (`ExpectedFunctionFoundVar z)
-      | Some (FunEntry { formals; result }) ->
+      | Some (FunEntry { formals; result; _ }) ->
           let rec check_args expected got =
             match (expected, got) with
             | [], [] -> Ok (z, result)
             | e :: exps, g :: gots ->
-                let* _, got_type = checkexp g in
+                let* _, got_type = checkexp g level in
                 if e ==~ got_type then check_args exps gots
                 else Error (`FunctionArgumentWrongType z)
             | [], _ | _, [] -> Error (`UnexpectedNumberOfArguments z)
@@ -172,12 +172,12 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.SeqExp exps as z -> (
       match List.nth_opt (List.rev exps) 0 with
       | Some (exp, _pos) ->
-          let* _, ty = checkexp exp in
+          let* _, ty = checkexp exp level in
           Ok (z, ty)
       | None -> Ok (z, T.UNIT))
   | A.WhileExp { test; body; pos = _ } as z -> (
-      let* _, test_type = checkexp test in
-      let* _, body_type = checkexp body in
+      let* _, test_type = checkexp test level in
+      let* _, body_type = checkexp body level in
       match (test_type, body_type) with
       | T.INT, T.UNIT -> Ok (z, T.UNIT)
       | _, T.UNIT -> Error (`WhileTestNotInt z)
@@ -185,8 +185,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | _, _ -> Error (`WhileTestAndBodyWrongType z))
   | A.BreakExp _ as z -> Ok (z, T.UNIT)
   | A.ArrayExp { typ; size; init; pos = _ } as z -> (
-      let* _, init_ty = checkexp init in
-      let* _, size_ty = checkexp size in
+      let* _, init_ty = checkexp init level in
+      let* _, size_ty = checkexp size level in
       let* found_type =
         S.look (S.symbol typ) types
         |> Option.to_result ~none:(`ArrayTypeNotFound z)
@@ -210,7 +210,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], _v -> Error (`WrongNumberOfFields z)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
-                let* _, l_ty = checkexp exp' in
+                let* _, l_ty = checkexp exp' level in
                 let types_compatible l_ty r_ty = l_ty =~ r_ty in
                 match (l_sym = r_sym, types_compatible l_ty r_ty) with
                 | true, true -> check_fields (ls, rs)
@@ -221,21 +221,24 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           check_fields (fields, found_fields)
       | _ -> Error (`RecordTypeNotRecord z))
   | A.AssignExp { var; exp; _ } as z ->
-      let* _, var_type = checkexp (A.VarExp var) in
-      let* _, exp_type = checkexp exp in
+      let* _, var_type = checkexp (A.VarExp var) level in
+      let* _, exp_type = checkexp exp level in
       if
         var_type ==~ exp_type
         || match exp_type with T.NIL -> true | _ -> false
       then Ok (z, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
-      let* _, lo_type = checkexp lo in
-      let* _, hi_type = checkexp hi in
+      let* _, lo_type = checkexp lo level in
+      let* _, hi_type = checkexp hi level in
 
       let new_vars =
-        S.enter (S.symbol var) (Env.VarEntry { ty = T.INT }) vars
+        S.enter (S.symbol var)
+          (Env.VarEntry
+             { access = Translate.alloc_local true level; ty = T.INT })
+          vars
       in
-      let* _, body_type = typecheck new_vars types body in
+      let* _, body_type = typecheck new_vars types body level in
 
       match (resolv lo_type, resolv hi_type, resolv body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var -> Ok (z, T.UNIT)
@@ -274,7 +277,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
             Ok (vars, types_with_headers)
         | A.VarDec { name; escape = _; typ; init; pos = _ } ->
-            let* _, init_ty = typecheck vars types init in
+            let* _, init_ty = typecheck vars types init level in
             let* var_ty =
               match typ with
               | None when resolv init_ty <>~ T.NIL -> Ok init_ty
@@ -283,11 +286,14 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                   match S.look (S.symbol s) types with
                   | None -> Error (`VariableTypeAnnotationNotFound pos)
                   | Some t when t =~ init_ty -> Ok (resolv t)
-                  | Some t ->
+                  | Some _ ->
                       Error (`VariableTypeAnnotationDoesntMatchExpression z))
             in
             let new_vars =
-              S.enter (S.symbol name) (Env.VarEntry { ty = var_ty }) vars
+              S.enter (S.symbol name)
+                (Env.VarEntry
+                   { access = Translate.alloc_local true level; ty = var_ty })
+                vars
             in
             Ok (new_vars, types)
         | A.FunctionDec fundecs ->
@@ -310,10 +316,23 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
             let add_function_header vars fundec =
               let A.{ name; params; result; _ } = fundec in
+              let escaping_params =
+                params |> List.map @@ fun (p : A.field) -> !(p.escape)
+              in
               let* formals = extract_formals params in
               let* result_ty = extract_result_type result in
-              let fe = Env.FunEntry { formals; result = result_ty } in
-              Ok (S.enter (S.symbol name) fe vars)
+              let sym = S.symbol name in
+              let fe =
+                Env.FunEntry
+                  {
+                    formals;
+                    result = result_ty;
+                    label = Temp.named_label fundec.name;
+                    level =
+                      Translate.new_level level sym escaping_params;
+                  }
+              in
+              Ok (S.enter sym fe vars)
             in
 
             let* vars_with_headers =
@@ -332,12 +351,14 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let bound_args =
                 List.fold_left2
                   (fun body_vars ty (field : A.field) ->
-                    let ve = Env.VarEntry { ty } in
+                    let ve =
+                      Env.VarEntry { access = Translate.alloc_local true level ; ty }
+                    in
                     S.enter (S.symbol field.name) ve body_vars)
                   vars_with_headers formals params
               in
 
-              let* _, actual_body_ty = typecheck bound_args types body in
+              let* _, actual_body_ty = typecheck bound_args types body level in
               if ty_eq actual_body_ty expected_result_ty then Ok ()
               else Error (`FunctionTypeAnnotationDoesntMatchExpression z)
             in
@@ -357,27 +378,51 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
 
       let* new_vars, new_types = checkdecs vars types decs in
-      let* _, body_type = typecheck new_vars new_types body in
+      let* _, body_type = typecheck new_vars new_types body level in
       Ok (z, body_type)
 
 let typecheckProg' (p : Absyn.exp) =
   let vars =
     Symbol.empty
     |> Symbol.enter (Symbol.symbol "print")
-         (Env.FunEntry { formals = [ T.STRING ]; result = T.UNIT })
+         (Env.FunEntry
+            {
+              formals = [ T.STRING ];
+              result = T.UNIT;
+              level = Outermost;
+              label = Temp.new_label ();
+            })
     |> Symbol.enter (Symbol.symbol "getchar")
-         (Env.FunEntry { formals = []; result = T.STRING })
+         (Env.FunEntry
+            {
+              formals = [];
+              result = T.STRING;
+              level = Outermost;
+              label = Temp.new_label ();
+            })
     |> Symbol.enter (Symbol.symbol "ord")
-         (Env.FunEntry { formals = [ T.STRING ]; result = T.INT })
+         (Env.FunEntry
+            {
+              formals = [ T.STRING ];
+              result = T.INT;
+              level = Outermost;
+              label = Temp.new_label ();
+            })
     |> Symbol.enter (Symbol.symbol "chr")
-         (Env.FunEntry { formals = [ T.INT ]; result = T.STRING })
+         (Env.FunEntry
+            {
+              formals = [ T.INT ];
+              result = T.STRING;
+              level = Outermost;
+              label = Temp.new_label ();
+            })
   in
   let types =
     Symbol.empty
     |> Symbol.enter (Symbol.symbol "int") T.INT
     |> Symbol.enter (Symbol.symbol "string") T.STRING
   in
-  let* _typechecked, _type = typecheck vars types p in
+  let* _typechecked, _type = typecheck vars types p Outermost in
   Ok ()
 
 exception IDKBro of string

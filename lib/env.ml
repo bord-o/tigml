@@ -1,9 +1,8 @@
-type access
 type ty = Types.ty [@@deriving show]
 
 type enventry =
-  | VarEntry of { ty : ty }
-  | FunEntry of { formals : ty list; result : ty } [@@deriving show]
+  | VarEntry of { access: Translate.access;  ty : ty }
+  | FunEntry of {level: Translate.level; label: Temp.label; formals : ty list; result : ty } [@@deriving show]
 
 type tenv = ty Symbol.table
 type venv = enventry Symbol.table
