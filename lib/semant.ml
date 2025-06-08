@@ -322,14 +322,14 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let* formals = extract_formals params in
               let* result_ty = extract_result_type result in
               let sym = S.symbol name in
+              let f_level = Translate.new_level level sym escaping_params in
               let fe =
                 Env.FunEntry
                   {
                     formals;
                     result = result_ty;
                     label = Temp.named_label fundec.name;
-                    level =
-                      Translate.new_level level sym escaping_params;
+                    level = f_level;
                   }
               in
               Ok (S.enter sym fe vars)
@@ -344,15 +344,25 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
 
             let check_function_body fundec =
-              let A.{ name = _; params; result; body; _ } = fundec in
+              let A.{ name; params; result; body; _ } = fundec in
               let* formals = extract_formals params in
               let* expected_result_ty = extract_result_type result in
+              let* fun_entry =
+                S.look (S.symbol name) vars_with_headers
+                |> Option.to_result ~none:(`FunctionNotFound z)
+              in
+
+              let fun_level =
+                match fun_entry with
+                | Env.FunEntry { level; _ } -> level
+                | _ -> failwith "Expected function entry"
+              in
 
               let bound_args =
                 List.fold_left2
                   (fun body_vars ty (field : A.field) ->
                     let ve =
-                      Env.VarEntry { access = Translate.alloc_local true level ; ty }
+                      Env.VarEntry { access = Translate.alloc_local true fun_level; ty }
                     in
                     S.enter (S.symbol field.name) ve body_vars)
                   vars_with_headers formals params
@@ -430,9 +440,8 @@ exception IDKBro of string
 let typecheckProg p =
   let res = typecheckProg' p in
   match res with
-  | Ok _v ->
-    print_endline "Ok"
+  | Ok _v -> print_endline "Ok"
   | Error e -> raise (IDKBro (show_typecheck_err e))
-  (* | Error e -> *)
-    (* print_endline "error: "; *)
-    (* print_endline @@ show_typecheck_err e *)
+(* | Error e -> *)
+(* print_endline "error: "; *)
+(* print_endline @@ show_typecheck_err e *)

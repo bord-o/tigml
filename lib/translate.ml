@@ -31,7 +31,7 @@ let new_level parent name formals =
   Level { parent; frame; unique = ref () }
 
 let formals = function
-  | Outermost -> failwith "Outermost level has no formals"
+  | Outermost -> []
   | Level { frame; parent = _; unique = _ } as level ->
       let frame_formals = Frame.formals frame in
       let without_static_link = List.tl frame_formals in
