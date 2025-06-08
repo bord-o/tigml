@@ -79,7 +79,7 @@ let () =
       Tigml.Semant.typecheckProg absyn;
       close_in infile;
       if should_pass then printf "✅ PASS\n" else printf "❌ SHOULD HAVE FAILED\n"
-    with e ->
+    with _e ->
       (* print_endline @@ Printexc.to_string e; *)
       if should_pass then printf "❌ FAIL\n" else printf "✅ EXPECTED FAIL\n"
   in

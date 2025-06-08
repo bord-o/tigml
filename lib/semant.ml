@@ -67,10 +67,10 @@ let break_check init (e : A.exp) =
     match e' with
     | A.BreakExp p -> (
         match in_loop with true -> () | false -> raise (BreakCheck p))
-    | A.WhileExp { test; body } ->
+    | A.WhileExp { test; body; _ } ->
         aux in_loop test;
         aux true body
-    | A.ForExp { lo; hi; body } ->
+    | A.ForExp { lo; hi; body; _ } ->
         aux in_loop lo;
         aux in_loop hi;
         aux true body
@@ -78,30 +78,30 @@ let break_check init (e : A.exp) =
     | A.NilExp -> ()
     | A.IntExp _ -> ()
     | A.StringExp (_, _) -> ()
-    | A.CallExp { args } -> args |> List.iter (aux in_loop)
-    | A.OpExp { left; right } ->
+    | A.CallExp { args; _ } -> args |> List.iter (aux in_loop)
+    | A.OpExp { left; right; _ } ->
         aux in_loop left;
         aux in_loop right
-    | A.RecordExp { fields } ->
+    | A.RecordExp { fields; _ } ->
         fields |> List.iter @@ fun (_, e, _) -> aux in_loop e
-    | A.ArrayExp { size; init } ->
+    | A.ArrayExp { size; init; _ } ->
         aux in_loop size;
         aux in_loop init
     | A.SeqExp es -> es |> List.iter @@ fun (e, _) -> aux in_loop e
-    | A.AssignExp { exp } -> aux in_loop exp
-    | A.IfExp { test; then'; else' } ->
+    | A.AssignExp { exp; _ } -> aux in_loop exp
+    | A.IfExp { test; then'; else'; _ } ->
         aux in_loop test;
         aux in_loop then';
         Option.map (aux in_loop) else' |> ignore
-    | A.LetExp { decs; body } -> (
+    | A.LetExp { decs; body; _ } -> (
         aux in_loop body;
         decs
         |> List.iter @@ fun (d : A.dec) ->
            match d with
            | A.FunctionDec fdecs ->
                fdecs
-               |> List.iter @@ fun ({ body } : A.fundec) -> aux in_loop body
-           | A.VarDec { init } -> aux in_loop init
+               |> List.iter @@ fun ({ body; _ } : A.fundec) -> aux in_loop body
+           | A.VarDec { init; _ } -> aux in_loop init
            | A.TypeDec _ -> ())
   in
   aux init e
