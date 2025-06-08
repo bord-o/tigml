@@ -1,0 +1,9 @@
+/* test_escape_simple.tig - should pass */
+let
+  function outer(): int =
+    let var x := 42
+        function inner(): int = x
+    in inner()
+    end
+in outer()
+end

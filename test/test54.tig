@@ -1,0 +1,8 @@
+/* test_string_builtins.tig - should pass */
+let
+  var c := getchar()
+  var num := ord(c)
+  var back := chr(num)
+in
+  print(back)
+end

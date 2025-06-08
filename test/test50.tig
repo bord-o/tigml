@@ -1,0 +1,9 @@
+/* test_deep_nesting.tig - should pass */
+let
+  type r1 = {f: r2}
+  type r2 = {f: r3}  
+  type r3 = {f: int}
+  var x := r1{f=r2{f=r3{f=42}}}
+in
+  x.f.f.f
+end

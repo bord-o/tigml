@@ -12,6 +12,7 @@ type typecheck_err =
   | `ArrayTypeNotFound of A.exp
   | `ArrayTypeTranslationNotFound of string * A.pos
   | `AssignmentTypesDontmatch of A.exp
+  | `BreakUsedOutsideOfLoop of A.pos
   | `CantAccessFieldOfNonRecordVariable of A.exp
   | `CantAccessSubscriptOfNonArrayVariable of A.exp
   | `CantDeclareNonReferenceVariableNil of A.exp
@@ -58,6 +59,52 @@ let ( ==~ ) = ty_eq
 let ( =~ ) = fun l r -> ty_eq l r || nullable (resolv l) (resolv r)
 let ( <>~ ) = fun l r -> not @@ ty_eq l r
 let ( let* ) = Result.bind
+
+exception BreakCheck of A.pos
+
+let break_check init (e : A.exp) =
+  let rec aux in_loop e' =
+    match e' with
+    | A.BreakExp p -> (
+        match in_loop with true -> () | false -> raise (BreakCheck p))
+    | A.WhileExp { test; body } ->
+        aux in_loop test;
+        aux true body
+    | A.ForExp { lo; hi; body } ->
+        aux in_loop lo;
+        aux in_loop hi;
+        aux true body
+    | A.VarExp _ -> ()
+    | A.NilExp -> ()
+    | A.IntExp _ -> ()
+    | A.StringExp (_, _) -> ()
+    | A.CallExp { args } -> args |> List.iter (aux in_loop)
+    | A.OpExp { left; right } ->
+        aux in_loop left;
+        aux in_loop right
+    | A.RecordExp { fields } ->
+        fields |> List.iter @@ fun (_, e, _) -> aux in_loop e
+    | A.ArrayExp { size; init } ->
+        aux in_loop size;
+        aux in_loop init
+    | A.SeqExp es -> es |> List.iter @@ fun (e, _) -> aux in_loop e
+    | A.AssignExp { exp } -> aux in_loop exp
+    | A.IfExp { test; then'; else' } ->
+        aux in_loop test;
+        aux in_loop then';
+        Option.map (aux in_loop) else' |> ignore
+    | A.LetExp { decs; body } -> (
+        aux in_loop body;
+        decs
+        |> List.iter @@ fun (d : A.dec) ->
+           match d with
+           | A.FunctionDec fdecs ->
+               fdecs
+               |> List.iter @@ fun ({ body } : A.fundec) -> aux in_loop body
+           | A.VarDec { init } -> aux in_loop init
+           | A.TypeDec _ -> ())
+  in
+  aux init e
 
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     (p : A.exp) (level : Translate.level) =
@@ -362,7 +409,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                 List.fold_left2
                   (fun body_vars ty (field : A.field) ->
                     let ve =
-                      Env.VarEntry { access = Translate.alloc_local true fun_level; ty }
+                      Env.VarEntry
+                        { access = Translate.alloc_local true fun_level; ty }
                     in
                     S.enter (S.symbol field.name) ve body_vars)
                   vars_with_headers formals params
@@ -438,10 +486,11 @@ let typecheckProg' (p : Absyn.exp) =
 exception IDKBro of string
 
 let typecheckProg p =
+  break_check false p;
   let res = typecheckProg' p in
   match res with
   | Ok _v -> print_endline "Ok"
   | Error e -> raise (IDKBro (show_typecheck_err e))
 (* | Error e -> *)
-(* print_endline "error: "; *)
-(* print_endline @@ show_typecheck_err e *)
+(*     print_endline "error: "; *)
+(*     print_endline @@ show_typecheck_err e *)

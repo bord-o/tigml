@@ -1,0 +1,2 @@
+/* test_precedence.tig - should pass */
+let var x := 2 + 3 * 4 - 1 in x end  /* should be 13, not 19 */

@@ -54,6 +54,12 @@ let () =
       ("test47.tig", true);
       ("test48.tig", true);
       ("test49.tig", false);
+      ("test50.tig", true);
+      ("test51.tig", false);
+      ("test52.tig", true);
+      ("test53.tig", true);
+      ("test54.tig", true);
+      ("test55.tig", true);
       ("merge.tig", true);
       ("queens.tig", true);
     ]
@@ -73,7 +79,7 @@ let () =
       Tigml.Semant.typecheckProg absyn;
       close_in infile;
       if should_pass then printf "✅ PASS\n" else printf "❌ SHOULD HAVE FAILED\n"
-    with _e ->
+    with e ->
       (* print_endline @@ Printexc.to_string e; *)
       if should_pass then printf "❌ FAIL\n" else printf "✅ EXPECTED FAIL\n"
   in

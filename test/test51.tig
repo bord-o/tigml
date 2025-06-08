@@ -1,0 +1,2 @@
+/* test_break_invalid.tig - should fail */
+let var x := 5 in break end
