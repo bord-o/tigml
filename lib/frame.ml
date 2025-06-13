@@ -1,15 +1,21 @@
 (*
-signature FRAME =
-s i g type frame
-type access
-val newFrame : (name: Temp.label, f o r m a l s : b o o l l i s t ) -› f r a m e
-val name : frame -> Temp. label
-val formals : frame a c c e s s l i s t
-val allocLocal : f r a m e -> b o o l - > a c c e s s
-end
+
+  val FP : Temp.temp    (* x8/s0 - frame pointer *)
+  val SP : Temp.temp    (* x2/sp - stack pointer *) 
+  val RV : Temp.temp    (* x10/a0 - return value *)
+  val RA : Temp.temp    (* x1/ra - return address *)
+
+  Argument registers: x10-x17 (a0-a7)
+  Saved registers: x8-x9, x18-x27 (s0-s11)
+  Temp registers: x5-x7, x28-x31 (t0-t6)
+
 *)
 
 let word_size = 8
+let fp = Temp.new_temp ()
+let sp = Temp.new_temp ()
+let rv = Temp.new_temp ()
+let ra = Temp.new_temp ()
 
 type access = InFrame of int | InReg of Temp.temp [@@deriving show]
 
@@ -46,3 +52,11 @@ let alloc_local frame _escapes =
   frame.offset := offset + word_size;
   let access = InFrame offset in
   access
+
+(* (TEMP ( F r a m e . F P ) ) = *)
+(* MEM (BINOP (PLUS, TEMP (Frame. FP) , CONST (k) ) ) *)
+let exp (a : access) (e ) =
+  let open Tree in
+  match a with
+  | InFrame f -> Mem (Binop (Plus, e, Const f))
+  | InReg temp -> Temp temp

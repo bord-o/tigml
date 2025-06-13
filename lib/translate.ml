@@ -1,17 +1,4 @@
-(*
-s i g n a t u r e sig
-TRANSLATE =
-type level
-type access (* not the same as Frame.access *)
-v a l o u t e r m o s t : l e v e l
-val newlevel : (parent: level, name: Temp. label,
-f o r m a l s : bool val formals: level -> access list
-v a l a l l o c L o c a l : l e v e l -> b o o l l i s t ) -> - > l e v e l
-a c c e s s
-e n d
-*)
-
-type exp = unit
+type exp = Tree.exp
 
 type level =
   | Level of { parent : level; frame : Frame.frame; unique : unit ref }
@@ -22,7 +9,6 @@ type access = level * Frame.access [@@deriving show]
 
 let outermost = Outermost
 let outermost_frame = Frame.new_frame (Temp.named_label "main") []
-
 
 let new_level parent name formals =
   let formals_with_link = true :: formals in
@@ -45,3 +31,12 @@ let alloc_local (escape : bool) = function
   | Level { frame; parent = _; unique = _ } as level ->
       let frame_access = Frame.alloc_local frame escape in
       (level, frame_access)
+
+let simple_var (venv ) (tenv ) (access : access) : exp =
+  (* Level has a frame and parent leve, access is a reg or temp *)
+  let level, frame_access = access in
+  match (level, frame_access) with
+  | Level l, InFrame n -> Tree.Const 99
+  | Level l, InReg temp -> Tree.Const 99
+  | Outermost, InFrame n -> Tree.Const 99
+  | Outermost, InReg temp -> Tree.Const 99

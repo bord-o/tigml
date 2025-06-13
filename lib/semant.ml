@@ -143,7 +143,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match found_var with
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
-      | Env.VarEntry v -> Ok (z, v.ty))
+      | Env.VarEntry v ->
+        Ok (z, v.ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
       let* _, record_type = checkexp (A.VarExp var) level in
       match resolv record_type with
