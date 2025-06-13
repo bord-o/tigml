@@ -143,8 +143,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match found_var with
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
-      | Env.VarEntry v ->
-        Ok (z, v.ty))
+      | Env.VarEntry v -> Ok (Tree.Const 99, v.ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
       let* _, record_type = checkexp (A.VarExp var) level in
       match resolv record_type with
@@ -154,41 +153,43 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             |> List.assoc_opt (S.symbol sym)
             |> Option.to_result ~none:(`RecordFieldDoesntExist z)
           in
-          Ok (z, field_ty)
+          Ok (Tree.Const 99, field_ty)
       | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
   | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
       let* _, array_type = checkexp (A.VarExp var) level in
       let* _, index_type = checkexp exp' level in
       match (resolv array_type, resolv index_type) with
-      | T.ARRAY (under_type, _r), T.INT -> Ok (z, under_type)
+      | T.ARRAY (under_type, _r), T.INT -> Ok (Tree.Const 99, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
       | T.ARRAY _, _ -> Error (`SubscriptMustBeInteger z)
       | _ -> Error (`SubscriptNonArrayAndNonIntegerIndex z))
-  | A.NilExp as z -> Ok (z, Types.NIL)
-  | A.IntExp _ as z -> Ok (z, Types.INT)
-  | A.StringExp (_, _) as z -> Ok (z, Types.STRING)
+  | A.NilExp as _z -> Ok (Tree.Const 0, Types.NIL)
+  | A.IntExp i as _z -> Ok (Tree.Const i, Types.INT)
+  | A.StringExp (s, _) as _z -> Ok (Translate.new_string s, Types.STRING)
   | A.OpExp oper as z -> (
       let op = oper.oper in
-      let* _, left = checkexp oper.left level in
-      let* _, right = checkexp oper.right level in
+      let* l_trans, left = checkexp oper.left level in
+      let* r_trans, right = checkexp oper.right level in
       let left, right = (resolv left, resolv right) in
       match (left, op, right) with
       (* Normal operators are normal *)
-      | T.INT, A.PlusOp, T.INT -> Ok (z, T.INT)
-      | T.INT, A.MinusOp, T.INT -> Ok (z, T.INT)
-      | T.INT, A.TimesOp, T.INT -> Ok (z, T.INT)
-      | T.INT, A.DivideOp, T.INT -> Ok (z, T.INT)
+      | T.INT, A.PlusOp, T.INT ->
+          Ok (Tree.Binop (Tree.Plus, l_trans, r_trans), T.INT)
+      | T.INT, A.MinusOp, T.INT -> Ok (Tree.Binop (Tree.Minus, l_trans, r_trans), T.INT)
+      | T.INT, A.TimesOp, T.INT -> Ok (Tree.Binop (Tree.Div, l_trans, r_trans), T.INT)
+      | T.INT, A.DivideOp, T.INT -> Ok (Tree.Binop (Tree.Mul, l_trans, r_trans), T.INT)
       (* Equality and non-equality have a special case for records but otherwise just ensure matching types *)
-      | T.RECORD _, o, T.RECORD _ when is_eq_neq_op o -> Ok (z, T.INT)
-      | T.RECORD _, o, T.NIL when is_eq_neq_op o -> Ok (z, T.INT)
-      | T.NIL, o, T.RECORD _ when is_eq_neq_op o -> Ok (z, T.INT)
-      | l, o, r when l ==~ r && is_eq_neq_op o -> Ok (z, T.INT)
-      | l, _o, r when l ==~ r -> Ok (z, l)
+      | T.RECORD _, o, T.RECORD _ when is_eq_neq_op o ->
+          Ok (Tree.Const 99, T.INT)
+      | T.RECORD _, o, T.NIL when is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
+      | T.NIL, o, T.RECORD _ when is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
+      | l, o, r when l ==~ r && is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
+      | l, _o, r when l ==~ r -> Ok (Tree.Const 99, l)
       (* Comparison operators work on ints and strings *)
-      | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
-      | l, A.LeOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
-      | l, A.GtOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
-      | l, A.GeOp, r when both_ints_or_strings (l, r) -> Ok (z, l)
+      | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
+      | l, A.LeOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
+      | l, A.GtOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
+      | l, A.GeOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
       (* And and or are short-circuiting and are handled in the parser *)
       | _ -> Error (`InvalidOperation z))
   | A.IfExp { test; then'; else'; pos = _ } as z -> (
@@ -199,9 +200,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         match else' with
         | Some e ->
             let* _, else_ty = checkexp e level in
-            if then_ty =~ else_ty then Ok (z, then_ty)
+            if then_ty =~ else_ty then Ok (Tree.Const 99, then_ty)
             else Error (`IfExpBranchTypesDiffer z)
-        | None -> Ok (z, then_ty))
+        | None -> Ok (Tree.Const 99, then_ty))
   | A.CallExp { func; args; pos = _ } as z -> (
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
@@ -209,7 +210,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | Some (FunEntry { formals; result; _ }) ->
           let rec check_args expected got =
             match (expected, got) with
-            | [], [] -> Ok (z, result)
+            | [], [] -> Ok (Tree.Const 99, result)
             | e :: exps, g :: gots ->
                 let* _, got_type = checkexp g level in
                 if e ==~ got_type then check_args exps gots
@@ -217,21 +218,21 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], _ | _, [] -> Error (`UnexpectedNumberOfArguments z)
           in
           check_args formals args)
-  | A.SeqExp exps as z -> (
+  | A.SeqExp exps as _z -> (
       match List.nth_opt (List.rev exps) 0 with
       | Some (exp, _pos) ->
           let* _, ty = checkexp exp level in
-          Ok (z, ty)
-      | None -> Ok (z, T.UNIT))
+          Ok (Tree.Const 99, ty)
+      | None -> Ok (Tree.Const 99, T.UNIT))
   | A.WhileExp { test; body; pos = _ } as z -> (
       let* _, test_type = checkexp test level in
       let* _, body_type = checkexp body level in
       match (test_type, body_type) with
-      | T.INT, T.UNIT -> Ok (z, T.UNIT)
+      | T.INT, T.UNIT -> Ok (Tree.Const 99, T.UNIT)
       | _, T.UNIT -> Error (`WhileTestNotInt z)
       | T.INT, _ -> Error (`WhileBodyNotUnit z)
       | _, _ -> Error (`WhileTestAndBodyWrongType z))
-  | A.BreakExp _ as z -> Ok (z, T.UNIT)
+  | A.BreakExp _ as _z -> Ok (Tree.Const 99, T.UNIT)
   | A.ArrayExp { typ; size; init; pos = _ } as z -> (
       let* _, init_ty = checkexp init level in
       let* _, size_ty = checkexp size level in
@@ -242,7 +243,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match (size_ty, resolv found_type) with
       | (T.INT, T.ARRAY (item_type, _)) as resolved_types
         when item_type ==~ init_ty ->
-          Ok (z, snd resolved_types)
+          Ok (Tree.Const 99, snd resolved_types)
       | T.INT, _ -> Error (`ArrayNotTypeArray z)
       | _, _ -> Error (`ArraySizeNotInteger z))
   | A.RecordExp { fields; typ; pos = _ } as z -> (
@@ -253,7 +254,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match resolv found_type with
       | T.RECORD (found_fields, _r) ->
           let rec check_fields = function
-            | [], [] -> Ok (z, found_type)
+            | [], [] -> Ok (Tree.Const 99, found_type)
             | _v, [] -> Error (`WrongNumberOfFields z)
             | [], _v -> Error (`WrongNumberOfFields z)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
@@ -274,7 +275,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       if
         var_type ==~ exp_type
         || match exp_type with T.NIL -> true | _ -> false
-      then Ok (z, T.UNIT)
+      then Ok (Tree.Const 99, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
       let* _, lo_type = checkexp lo level in
@@ -289,7 +290,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* _, body_type = typecheck new_vars types body level in
 
       match (resolv lo_type, resolv hi_type, resolv body_type) with
-      | T.INT, T.INT, T.UNIT when not @@ assigned_in body var -> Ok (z, T.UNIT)
+      | T.INT, T.INT, T.UNIT when not @@ assigned_in body var ->
+          Ok (Tree.Const 99, T.UNIT)
       | T.INT, T.INT, T.UNIT -> Error (`CantReassignForLoopVariable z)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
       | _, _, _ -> Error (`ForLoopBodyReturnsValue z))
@@ -438,7 +440,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
       let* new_vars, new_types = checkdecs vars types decs in
       let* _, body_type = typecheck new_vars new_types body level in
-      Ok (z, body_type)
+      Ok (Tree.Const 99, body_type)
 
 let typecheckProg' (p : Absyn.exp) =
   let vars =

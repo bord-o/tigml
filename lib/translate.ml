@@ -7,6 +7,8 @@ type level =
 
 type access = level * Frame.access [@@deriving show]
 
+let global_fragments : Frame.fragment list ref =  ref []
+
 let outermost = Outermost
 let outermost_frame = Frame.new_frame (Temp.named_label "main") []
 
@@ -31,6 +33,12 @@ let alloc_local (escape : bool) = function
   | Level { frame; parent = _; unique = _ } as level ->
       let frame_access = Frame.alloc_local frame escape in
       (level, frame_access)
+
+let new_string s =
+      let lab = Temp.new_label() in
+      let frag = Frame.String (lab, s) in
+      global_fragments := frag :: !global_fragments;
+      Tree.Name(lab)
 
 let simple_var (venv ) (tenv ) (access : access) : exp =
   (* Level has a frame and parent leve, access is a reg or temp *)

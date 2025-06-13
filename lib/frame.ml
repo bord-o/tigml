@@ -27,6 +27,8 @@ type frame = {
 }
 [@@deriving show]
 
+type fragment = String of Temp.label * string | Proc of {body:Tree.stm ; frame:frame}
+
 (* This is called when a function is entered *)
 let new_frame (name : Temp.label) (formals : bool list) =
   let rec allocate_formals offset acc = function
