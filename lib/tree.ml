@@ -11,7 +11,7 @@ and stm =
   | Move of exp * exp
   | Exp of exp
   | Jump of exp * Temp.label list
-  | CJump of relop * exp * exp * Temp.label
+  | CJump of relop * exp * exp * Temp.label * Temp.label
   | Seq of stm * stm
   | Label of Temp.label
 

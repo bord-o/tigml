@@ -17,6 +17,8 @@ type typecheck_err =
   | `CantAccessSubscriptOfNonArrayVariable of A.exp
   | `CantDeclareNonReferenceVariableNil of A.exp
   | `CantReassignForLoopVariable of A.exp
+  | `CantTreatRelopAsBinop
+  | `CantTreatBinopAsRelop
   | `ExpectedFunctionFoundVar of A.exp
   | `ExpectedVariableGotFunction of A.exp
   | `ForLoopBodyReturnsValue of A.exp
@@ -166,43 +168,50 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.NilExp as _z -> Ok (Tree.Const 0, Types.NIL)
   | A.IntExp i as _z -> Ok (Tree.Const i, Types.INT)
   | A.StringExp (s, _) as _z -> Ok (Translate.new_string s, Types.STRING)
-  | A.OpExp oper as z -> (
+  | A.OpExp oper as z ->
       let op = oper.oper in
       let* l_trans, left = checkexp oper.left level in
       let* r_trans, right = checkexp oper.right level in
       let left, right = (resolv left, resolv right) in
-      match (left, op, right) with
-      (* Normal operators are normal *)
-      | T.INT, A.PlusOp, T.INT ->
-          Ok (Tree.Binop (Tree.Plus, l_trans, r_trans), T.INT)
-      | T.INT, A.MinusOp, T.INT -> Ok (Tree.Binop (Tree.Minus, l_trans, r_trans), T.INT)
-      | T.INT, A.TimesOp, T.INT -> Ok (Tree.Binop (Tree.Div, l_trans, r_trans), T.INT)
-      | T.INT, A.DivideOp, T.INT -> Ok (Tree.Binop (Tree.Mul, l_trans, r_trans), T.INT)
-      (* Equality and non-equality have a special case for records but otherwise just ensure matching types *)
-      | T.RECORD _, o, T.RECORD _ when is_eq_neq_op o ->
-          Ok (Tree.Const 99, T.INT)
-      | T.RECORD _, o, T.NIL when is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
-      | T.NIL, o, T.RECORD _ when is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
-      | l, o, r when l ==~ r && is_eq_neq_op o -> Ok (Tree.Const 99, T.INT)
-      | l, _o, r when l ==~ r -> Ok (Tree.Const 99, l)
-      (* Comparison operators work on ints and strings *)
-      | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
-      | l, A.LeOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
-      | l, A.GtOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
-      | l, A.GeOp, r when both_ints_or_strings (l, r) -> Ok (Tree.Const 99, l)
-      (* And and or are short-circuiting and are handled in the parser *)
-      | _ -> Error (`InvalidOperation z))
+      let* ty =
+        match (left, op, right) with
+        (* Normal operators are normal *)
+        | T.INT, A.PlusOp, T.INT -> Ok T.INT
+        | T.INT, A.MinusOp, T.INT -> Ok T.INT
+        | T.INT, A.TimesOp, T.INT -> Ok T.INT
+        | T.INT, A.DivideOp, T.INT -> Ok T.INT
+        (* Equality and non-equality have a special case for records but otherwise just ensure matching types *)
+        | T.RECORD _, o, T.RECORD _ when is_eq_neq_op o -> Ok T.INT
+        | T.RECORD _, o, T.NIL when is_eq_neq_op o -> Ok T.INT
+        | T.NIL, o, T.RECORD _ when is_eq_neq_op o -> Ok T.INT
+        | l, o, r when l ==~ r && is_eq_neq_op o -> Ok T.INT
+        | l, _o, r when l ==~ r -> Ok l
+        (* Comparison operators work on ints and strings *)
+        | l, A.LtOp, r when both_ints_or_strings (l, r) -> Ok l
+        | l, A.LeOp, r when both_ints_or_strings (l, r) -> Ok l
+        | l, A.GtOp, r when both_ints_or_strings (l, r) -> Ok l
+        | l, A.GeOp, r when both_ints_or_strings (l, r) -> Ok l
+        (* And and or are short-circuiting and are handled in the parser *)
+        | _ -> Error (`InvalidOperation z)
+      in
+      let* ir = Translate.operation l_trans r_trans op in
+      Ok (ir, ty)
   | A.IfExp { test; then'; else'; pos = _ } as z -> (
-      let* _, test_ty = checkexp test level in
+      let* test_ir, test_ty = checkexp test level in
       if test_ty <>~ T.INT then Error (`IfExpTestNotAnInteger z)
       else
-        let* _, then_ty = checkexp then' level in
+        let* then_ir, then_ty = checkexp then' level in
         match else' with
         | Some e ->
-            let* _, else_ty = checkexp e level in
-            if then_ty =~ else_ty then Ok (Tree.Const 99, then_ty)
+            let* else_ir, else_ty = checkexp e level in
+            if then_ty =~ else_ty then
+              (* TODO *)
+              let* ir = Translate.if' test_ir then_ir else_ir in
+              Ok (Tree.Const 99, then_ty)
             else Error (`IfExpBranchTypesDiffer z)
-        | None -> Ok (Tree.Const 99, then_ty))
+        | None ->
+            (* TODO *)
+            Ok (Tree.Const 99, then_ty))
   | A.CallExp { func; args; pos = _ } as z -> (
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
