@@ -97,17 +97,31 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
              Temp result ))
 
 let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
-  let t = Temp.new_label () in
-  let f = Temp.new_label () in
-  let join = Temp.new_label () in
-  let r = Temp.new_temp () in
+  let true_label = Temp.new_label () in
+  let false_label = Temp.new_label () in
+  let done_label = Temp.new_label () in
+  let result = Temp.new_temp () in
   Ok
     (ESeq
-       ( CJump (NE, test, Const 0, t, f)
-         ++ Label t
-         ++ Move (Temp r, then')
-         ++ Jump (Name join, [ join ])
-         ++ Label f
-         ++ Move (Temp r, else')
-         ++ Label join,
-         Temp r ))
+       ( CJump (NE, test, Const 0, true_label, false_label)
+         ++ Label true_label
+         ++ Move (Temp result, then')
+         ++ Jump (Name done_label, [ done_label ])
+         ++ Label false_label
+         ++ Move (Temp result, else')
+         ++ Label done_label,
+         Temp result ))
+
+let seq (exps : Tree.exp list) =
+  match List.rev exps with
+  | [] -> Const 0
+  | last :: rest ->
+      let build_seq_stmt = function
+        | [] -> Exp (Const 0) (* Could also use a no-op statement *)
+        | exps ->
+            let stmts = List.map (fun e -> Exp e) exps in
+            List.fold_left
+              (fun acc s -> Seq (acc, s))
+              (List.hd stmts) (List.tl stmts)
+      in
+      ESeq (build_seq_stmt (List.rev rest), last)

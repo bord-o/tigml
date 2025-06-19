@@ -18,13 +18,12 @@ let () =
       ("test12.tig", true);
       ("test13.tig", false);
       ("test14.tig", false);
-      ("test15.tig", true);
-      ("test16.tig", true);
+      ("test15.tig", false);
+      ("test16.tig", false);
       ("test17.tig", false);
-      ("test18.tig", true);
-      ("test18.tig", true);
-      ("test19.tig", true);
-      ("test20.tig", true);
+      ("test18.tig", false);
+      ("test19.tig", false);
+      ("test20.tig", false);
       ("test21.tig", false);
       ("test22.tig", false);
       ("test23.tig", false);
@@ -42,8 +41,8 @@ let () =
       ("test35.tig", false);
       ("test36.tig", false);
       ("test37.tig", true);
-      ("test38.tig", true);
-      ("test39.tig", true);
+      ("test38.tig", false);
+      ("test39.tig", false);
       ("test40.tig", false);
       ("test41.tig", true);
       ("test42.tig", true);
@@ -79,7 +78,7 @@ let () =
       Tigml.Semant.typecheckProg absyn;
       close_in infile;
       if should_pass then printf "✅ PASS\n" else printf "❌ SHOULD HAVE FAILED\n"
-    with _e ->
+    with e ->
       (* print_endline @@ Printexc.to_string e; *)
       if should_pass then printf "❌ FAIL\n" else printf "✅ EXPECTED FAIL\n"
   in

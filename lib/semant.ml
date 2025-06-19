@@ -29,6 +29,7 @@ type typecheck_err =
   | `FunctionTypeAnnotationDoesntMatchExpression of A.exp
   | `IfExpBranchTypesDiffer of A.exp
   | `IfExpTestNotAnInteger of A.exp
+  | `IfWithoutElseBranchMustBeUnitType of A.exp
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
   | `RecordFieldDoesntExist of A.exp
@@ -205,13 +206,14 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
         | Some e ->
             let* else_ir, else_ty = checkexp e level in
             if then_ty =~ else_ty then
-              (* TODO *)
               let* ir = Translate.if' test_ir then_ir else_ir in
-              Ok (Tree.Const 99, then_ty)
+              Ok (ir, then_ty)
             else Error (`IfExpBranchTypesDiffer z)
         | None ->
-            (* TODO *)
-            Ok (Tree.Const 99, then_ty))
+            if then_ty =~ T.UNIT then
+              let* ir = Translate.if' test_ir then_ir (Const 0) in
+              Ok (ir, then_ty)
+            else Error (`IfWithoutElseBranchMustBeUnitType z))
   | A.CallExp { func; args; pos = _ } as z -> (
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
@@ -227,12 +229,22 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], _ | _, [] -> Error (`UnexpectedNumberOfArguments z)
           in
           check_args formals args)
-  | A.SeqExp exps as _z -> (
-      match List.nth_opt (List.rev exps) 0 with
-      | Some (exp, _pos) ->
-          let* _, ty = checkexp exp level in
-          Ok (Tree.Const 99, ty)
-      | None -> Ok (Tree.Const 99, T.UNIT))
+  | A.SeqExp exps as _z ->
+      let* final_ty =
+        match List.nth_opt (List.rev exps) 0 with
+        | Some (exp, _pos) ->
+            let* _, ty = checkexp exp level in
+            Ok ty
+        | None -> Ok T.UNIT
+      in
+      let* stms =
+        List.map fst exps
+        |> List.map (fun e -> checkexp e level)
+        |> sequence_results
+        |> Result.map (List.map fst)
+      in
+      let ir = Translate.seq stms in
+      Ok (ir, final_ty)
   | A.WhileExp { test; body; pos = _ } as z -> (
       let* _, test_type = checkexp test level in
       let* _, body_type = checkexp body level in
