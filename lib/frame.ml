@@ -27,7 +27,9 @@ type frame = {
 }
 [@@deriving show]
 
-type fragment = String of Temp.label * string | Proc of {body:Tree.stm ; frame:frame}
+type fragment =
+  | String of Temp.label * string
+  | Proc of { body : Tree.stm; frame : frame }
 
 (* This is called when a function is entered *)
 let new_frame (name : Temp.label) (formals : bool list) =
@@ -55,9 +57,7 @@ let alloc_local frame _escapes =
   let access = InFrame offset in
   access
 
-(* (TEMP ( F r a m e . F P ) ) = *)
-(* MEM (BINOP (PLUS, TEMP (Frame. FP) , CONST (k) ) ) *)
-let exp (a : access) (e ) =
+let exp (a : access) e =
   let open Tree in
   match a with
   | InFrame f -> Mem (Binop (Plus, e, Const f))

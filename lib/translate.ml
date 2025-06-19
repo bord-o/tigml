@@ -9,6 +9,12 @@ type level =
   | Outermost
 [@@deriving show]
 
+let level_eq a b =
+  match (a, b) with
+  | Outermost, Outermost -> true
+  | Level { unique = u1 }, Level { unique = u2 } when u1 = u2 -> true
+  | _ -> false
+
 type access = level * Frame.access [@@deriving show]
 
 let global_fragments : Frame.fragment list ref = ref []
@@ -71,6 +77,7 @@ let map_relop = function
 
 let ( ++ ) s1 s2 = Seq (s1, s2)
 
+(* TODO: Test this*)
 (* lets just handle conditionals by setting a reg to 0 or 1 *)
 let operation (l : Tree.exp) (r : Tree.exp) = function
   | (Absyn.PlusOp | Absyn.MinusOp | Absyn.TimesOp | Absyn.DivideOp) as op ->
@@ -96,6 +103,7 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
              ++ Label done_label,
              Temp result ))
 
+(* TODO: Test this*)
 let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
   let true_label = Temp.new_label () in
   let false_label = Temp.new_label () in
@@ -112,6 +120,7 @@ let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
          ++ Label done_label,
          Temp result ))
 
+(* TODO: Test this*)
 let seq (exps : Tree.exp list) =
   match List.rev exps with
   | [] -> Const 0
@@ -125,3 +134,36 @@ let seq (exps : Tree.exp list) =
               (List.hd stmts) (List.tl stmts)
       in
       ESeq (build_seq_stmt (List.rev rest), last)
+
+let get_frame = function Outermost -> outermost_frame | Level l -> l.frame
+let get_parent = function Outermost -> None | Level l -> Some l.parent
+
+(* TODO: Test this*)
+(* Here lg is where the variable is declared and lf is where its used *)
+let rec traverse_static_links (dec_level : level) (use_level : level) fp =
+  if level_eq dec_level use_level then
+    (* Same level - just return the frame pointer *)
+    Ok fp
+  else
+    match use_level with
+    | Outermost -> Ok fp
+    | Level l -> (
+        (* Get the static link from the current frame *)
+        let current_frame = l.frame in
+        let static_link = List.hd (Frame.formals current_frame) in
+        match static_link with
+        | Frame.InReg _ -> Error (`StaticLinkShouldNotBeInReg current_frame)
+        | Frame.InFrame offset ->
+            (* Follow the static link *)
+            let static_link_addr = Mem (Binop (Plus, fp, Const offset)) in
+            traverse_static_links dec_level l.parent static_link_addr)
+
+(* TODO: Test this*)
+let simple_var (access : access) ty (use_level : level) =
+  let dec_level, frame_access = access in
+  match frame_access with
+  | Frame.InReg temp -> Ok (Temp temp)
+  | Frame.InFrame offset when level_eq dec_level use_level ->
+      Ok (Mem (Binop (Plus, Temp Frame.fp, Const offset)))
+  | Frame.InFrame offset ->
+      traverse_static_links dec_level use_level (Temp Frame.fp)

@@ -30,6 +30,7 @@ type typecheck_err =
   | `IfExpBranchTypesDiffer of A.exp
   | `IfExpTestNotAnInteger of A.exp
   | `IfWithoutElseBranchMustBeUnitType of A.exp
+  | `InvalidStaticLinkTraversal
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
   | `RecordFieldDoesntExist of A.exp
@@ -41,8 +42,10 @@ type typecheck_err =
   | `RecordTypeTranslatinoNotFound of string
   | `SubscriptMustBeInteger of A.exp
   | `SubscriptNonArrayAndNonIntegerIndex of A.exp
+  | `StaticLinkShouldNotBeInReg of Frame.frame
   | `UnexpectedNumberOfArguments of A.exp
   | `UnknownFunctionDecArgType
+  | `Unimplemented
   | `VariableNotFound of A.exp
   | `VariableTypeAnnotationDoesntMatchExpression of A.exp
   | `VariableTypeAnnotationNotFound of A.pos
@@ -146,7 +149,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match found_var with
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
-      | Env.VarEntry v -> Ok (Tree.Const 99, v.ty))
+      | Env.VarEntry { access; ty } ->
+          let* ir = Translate.simple_var access ty level in
+          Ok (Tree.Const 99, ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
       let* _, record_type = checkexp (A.VarExp var) level in
       match resolv record_type with
@@ -214,6 +219,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let* ir = Translate.if' test_ir then_ir (Const 0) in
               Ok (ir, then_ty)
             else Error (`IfWithoutElseBranchMustBeUnitType z))
+  (* TODO: call exp gets a static link i first param that points to the top of the frame (get from cur level)*)
   | A.CallExp { func; args; pos = _ } as z -> (
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
@@ -513,7 +519,7 @@ let typecheckProg p =
   break_check false p;
   let res = typecheckProg' p in
   match res with
-  | Ok _v -> print_endline "Ok"
+  | Ok _v -> () (*print_endline "Ok"*)
   | Error e -> raise (IDKBro (show_typecheck_err e))
 (* | Error e -> *)
 (*     print_endline "error: "; *)
