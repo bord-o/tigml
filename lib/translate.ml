@@ -103,6 +103,15 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
              ++ Label done_label,
              Temp result ))
 
+(*
+    TODO: IR gen
+    TODO: How do breaks work here?
+ *)
+let while' (test : exp) (body : exp) =
+  let done_label = Temp.new_label () in
+  let body_label = Temp.new_label () in
+  Ok (Const 99)
+
 (* TODO: Test this*)
 let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
   let true_label = Temp.new_label () in

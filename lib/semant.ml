@@ -238,7 +238,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           in
           let* call_ty = check_args formals args in
           let* ir = Translate.call label !formals_ir dec_level level in
-          Ok (Tree.Const 99, call_ty))
+          Ok (ir, call_ty))
   | A.SeqExp exps as _z ->
       let* final_ty =
         match List.nth_opt (List.rev exps) 0 with
@@ -256,10 +256,11 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let ir = Translate.seq stms in
       Ok (ir, final_ty)
   | A.WhileExp { test; body; pos = _ } as z -> (
-      let* _, test_type = checkexp test level in
-      let* _, body_type = checkexp body level in
+      let* test_ir, test_type = checkexp test level in
+      let* body_ir, body_type = checkexp body level in
+      let* ir = Translate.while' test_ir body_ir in
       match (test_type, body_type) with
-      | T.INT, T.UNIT -> Ok (Tree.Const 99, T.UNIT)
+      | T.INT, T.UNIT -> Ok (ir, T.UNIT)
       | _, T.UNIT -> Error (`WhileTestNotInt z)
       | T.INT, _ -> Error (`WhileBodyNotUnit z)
       | _, _ -> Error (`WhileTestAndBodyWrongType z))

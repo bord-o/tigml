@@ -7,3 +7,22 @@ something working that isn't a total mess.
 
 
 ## TODOs
+[ ] WhileExp
+[ ] BreakExp
+[ ] ArrayExp
+[ ] RecordExp
+[ ] AssignExp
+[ ] ForExp
+[ ] LetExp
+    [ ] VarDec
+    [ ] FunDec
+[ ] FieldVar
+[ ] SubscriptVar
+[ x ] SimpleVar
+[ x ] NilExp
+[ x ] IntExp
+[ x ] StringExp
+[ x ] OpExp
+[ x ] IfExp
+[ x ] CallExp
+[ x ] SeqExp
