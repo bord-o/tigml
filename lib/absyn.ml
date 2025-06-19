@@ -8,7 +8,6 @@ let pp_pos fmt (p : pos) =
 (* Add this line to make ppx_deriving aware of the printer *)
 let show_pos p = Format.asprintf "%a" pp_pos p
 
-
 type oper =
   | PlusOp
   | MinusOp
@@ -80,4 +79,3 @@ and ty =
   | RecordTy of field list
   | ArrayTy of symbol * pos
 [@@deriving show]
-

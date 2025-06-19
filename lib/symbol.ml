@@ -37,10 +37,13 @@ let table_to_list table = Table.bindings table
 let pp_table pp_val fmt table =
   let assoc_list = table_to_list table in
   Format.fprintf fmt "@[<v 0>";
-  List.iter (fun (key, value) ->
-    Format.fprintf fmt "%a: %a@," pp_symbol key pp_val value
-  ) assoc_list;
+  List.iter
+    (fun (key, value) ->
+      Format.fprintf fmt "%a: %a@," pp_symbol key pp_val value)
+    assoc_list;
   Format.fprintf fmt "@]"
 
 let show_table show_val table =
-  Format.asprintf "%a" (pp_table (fun fmt v -> Format.pp_print_string fmt (show_val v))) table
+  Format.asprintf "%a"
+    (pp_table (fun fmt v -> Format.pp_print_string fmt (show_val v)))
+    table

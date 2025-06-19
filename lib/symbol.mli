@@ -1,4 +1,3 @@
-
 type symbol = string * int
 
 val pp_symbol : Format.formatter -> symbol -> unit
@@ -19,5 +18,4 @@ type 'a table
 val empty : 'a table
 val enter : symbol -> 'a -> 'a table -> 'a table
 val look : symbol -> 'a table -> 'a option
-
 val show_table : ('a -> string) -> 'a table -> string
