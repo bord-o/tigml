@@ -140,7 +140,7 @@ let get_parent = function Outermost -> None | Level l -> Some l.parent
 
 (* TODO: Test this*)
 (* Here lg is where the variable is declared and lf is where its used *)
-let rec traverse_static_links (dec_level : level) (use_level : level) fp =
+let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
   if level_eq dec_level use_level then
     (* Same level - just return the frame pointer *)
     Ok fp
@@ -156,7 +156,8 @@ let rec traverse_static_links (dec_level : level) (use_level : level) fp =
         | Frame.InFrame offset ->
             (* Follow the static link *)
             let static_link_addr = Mem (Binop (Plus, fp, Const offset)) in
-            traverse_static_links dec_level l.parent static_link_addr)
+            traverse_static_links ~dec_level ~use_level:l.parent
+              static_link_addr)
 
 (* TODO: Test this*)
 let simple_var (access : access) ty (use_level : level) =
@@ -166,4 +167,26 @@ let simple_var (access : access) ty (use_level : level) =
   | Frame.InFrame offset when level_eq dec_level use_level ->
       Ok (Mem (Binop (Plus, Temp Frame.fp, Const offset)))
   | Frame.InFrame offset ->
-      traverse_static_links dec_level use_level (Temp Frame.fp)
+      traverse_static_links ~dec_level ~use_level (Temp Frame.fp)
+
+let static_link_for_call ~(callee_level : level) ~(current_level : level) =
+  match callee_level with
+  | Outermost ->
+      (* Even outermost functions need a static link to access globals *)
+      (* The static link should point to the outermost_frame *)
+      traverse_static_links ~dec_level:Outermost ~use_level:current_level
+        (Temp Frame.fp)
+  | Level { parent; _ } ->
+      (* Find the frame pointer of the callee's parent *)
+      traverse_static_links ~dec_level:parent ~use_level:current_level
+        (Temp Frame.fp)
+
+(*
+    Need to find the level of the enclosing environment  of the function and pass a pointer to that so that the function body can access variables at that level
+*)
+let call label (args : exp list) dec_level call_level =
+  let* static_link =
+    static_link_for_call ~callee_level:dec_level ~current_level:call_level
+  in
+  let args_with_link = static_link :: args in
+  Ok (Call (Name label, args_with_link))

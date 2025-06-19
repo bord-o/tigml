@@ -224,17 +224,21 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
       | Some (VarEntry _) -> Error (`ExpectedFunctionFoundVar z)
-      | Some (FunEntry { formals; result; _ }) ->
+      | Some (FunEntry { formals; result; level = dec_level; label }) ->
+          let formals_ir = ref [] in
           let rec check_args expected got =
             match (expected, got) with
-            | [], [] -> Ok (Tree.Const 99, result)
+            | [], [] -> Ok result
             | e :: exps, g :: gots ->
-                let* _, got_type = checkexp g level in
+                let* arg_ir, got_type = checkexp g level in
+                formals_ir := arg_ir :: !formals_ir;
                 if e ==~ got_type then check_args exps gots
                 else Error (`FunctionArgumentWrongType z)
             | [], _ | _, [] -> Error (`UnexpectedNumberOfArguments z)
           in
-          check_args formals args)
+          let* call_ty = check_args formals args in
+          let* ir = Translate.call label !formals_ir dec_level level in
+          Ok (Tree.Const 99, call_ty))
   | A.SeqExp exps as _z ->
       let* final_ty =
         match List.nth_opt (List.rev exps) 0 with
