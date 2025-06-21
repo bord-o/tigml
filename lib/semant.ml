@@ -113,8 +113,11 @@ let break_check init (e : A.exp) =
   aux init e
 
 let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
-    (p : A.exp) (level : Translate.level) =
-  let checkexp p level = typecheck vars types p level in
+    (p : A.exp) (level : Translate.level)
+    (break_context : Translate.break_context) =
+  let checkexp p level break_context =
+    typecheck vars types p level break_context
+  in
   (* TODO: finish this *)
   let assigned_in _exp' _v = false in
   let type_of_abstract_type tenv (typ : A.ty) =
@@ -151,9 +154,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
       | Env.VarEntry { access; ty } ->
           let* ir = Translate.simple_var access ty level in
-          Ok (Tree.Const 99, ty))
+          Ok (ir, ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
-      let* _, record_type = checkexp (A.VarExp var) level in
+      let* _, record_type = checkexp (A.VarExp var) level break_context in
       match resolv record_type with
       | T.RECORD (fields, _r) ->
           let* field_ty =
@@ -164,8 +167,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           Ok (Tree.Const 99, field_ty)
       | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
   | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
-      let* _, array_type = checkexp (A.VarExp var) level in
-      let* _, index_type = checkexp exp' level in
+      let* _, array_type = checkexp (A.VarExp var) level break_context in
+      let* _, index_type = checkexp exp' level break_context in
       match (resolv array_type, resolv index_type) with
       | T.ARRAY (under_type, _r), T.INT -> Ok (Tree.Const 99, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
@@ -176,8 +179,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.StringExp (s, _) as _z -> Ok (Translate.new_string s, Types.STRING)
   | A.OpExp oper as z ->
       let op = oper.oper in
-      let* l_trans, left = checkexp oper.left level in
-      let* r_trans, right = checkexp oper.right level in
+      let* l_trans, left = checkexp oper.left level break_context in
+      let* r_trans, right = checkexp oper.right level break_context in
       let left, right = (resolv left, resolv right) in
       let* ty =
         match (left, op, right) with
@@ -203,13 +206,13 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* ir = Translate.operation l_trans r_trans op in
       Ok (ir, ty)
   | A.IfExp { test; then'; else'; pos = _ } as z -> (
-      let* test_ir, test_ty = checkexp test level in
+      let* test_ir, test_ty = checkexp test level break_context in
       if test_ty <>~ T.INT then Error (`IfExpTestNotAnInteger z)
       else
-        let* then_ir, then_ty = checkexp then' level in
+        let* then_ir, then_ty = checkexp then' level break_context in
         match else' with
         | Some e ->
-            let* else_ir, else_ty = checkexp e level in
+            let* else_ir, else_ty = checkexp e level break_context in
             if then_ty =~ else_ty then
               let* ir = Translate.if' test_ir then_ir else_ir in
               Ok (ir, then_ty)
@@ -230,7 +233,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             match (expected, got) with
             | [], [] -> Ok result
             | e :: exps, g :: gots ->
-                let* arg_ir, got_type = checkexp g level in
+                let* arg_ir, got_type = checkexp g level break_context in
                 formals_ir := arg_ir :: !formals_ir;
                 if e ==~ got_type then check_args exps gots
                 else Error (`FunctionArgumentWrongType z)
@@ -243,31 +246,36 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* final_ty =
         match List.nth_opt (List.rev exps) 0 with
         | Some (exp, _pos) ->
-            let* _, ty = checkexp exp level in
+            let* _, ty = checkexp exp level break_context in
             Ok ty
         | None -> Ok T.UNIT
       in
       let* stms =
         List.map fst exps
-        |> List.map (fun e -> checkexp e level)
+        |> List.map (fun e -> checkexp e level break_context)
         |> sequence_results
         |> Result.map (List.map fst)
       in
       let ir = Translate.seq stms in
       Ok (ir, final_ty)
   | A.WhileExp { test; body; pos = _ } as z -> (
-      let* test_ir, test_type = checkexp test level in
-      let* body_ir, body_type = checkexp body level in
-      let* ir = Translate.while' test_ir body_ir in
+      let* test_ir, test_type = checkexp test level break_context in
+      let done_label = Temp.new_label () in
+      (* Here we calculate the done label before generating the code for while *)
+      (* This allows the body to have access to the proper break point *)
+      let* body_ir, body_type = checkexp body level (Some done_label) in
+      let* ir = Translate.while' test_ir body_ir done_label in
       match (test_type, body_type) with
       | T.INT, T.UNIT -> Ok (ir, T.UNIT)
       | _, T.UNIT -> Error (`WhileTestNotInt z)
       | T.INT, _ -> Error (`WhileBodyNotUnit z)
       | _, _ -> Error (`WhileTestAndBodyWrongType z))
-  | A.BreakExp _ as _z -> Ok (Tree.Const 99, T.UNIT)
+  | A.BreakExp pos as _z ->
+      let* ir = Translate.break' break_context pos in
+      Ok (ir, T.UNIT)
   | A.ArrayExp { typ; size; init; pos = _ } as z -> (
-      let* _, init_ty = checkexp init level in
-      let* _, size_ty = checkexp size level in
+      let* _, init_ty = checkexp init level break_context in
+      let* _, size_ty = checkexp size level break_context in
       let* found_type =
         S.look (S.symbol typ) types
         |> Option.to_result ~none:(`ArrayTypeNotFound z)
@@ -291,7 +299,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             | [], _v -> Error (`WrongNumberOfFields z)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
-                let* _, l_ty = checkexp exp' level in
+                let* _, l_ty = checkexp exp' level break_context in
                 let types_compatible l_ty r_ty = l_ty =~ r_ty in
                 match (l_sym = r_sym, types_compatible l_ty r_ty) with
                 | true, true -> check_fields (ls, rs)
@@ -302,16 +310,16 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           check_fields (fields, found_fields)
       | _ -> Error (`RecordTypeNotRecord z))
   | A.AssignExp { var; exp; _ } as z ->
-      let* _, var_type = checkexp (A.VarExp var) level in
-      let* _, exp_type = checkexp exp level in
+      let* _, var_type = checkexp (A.VarExp var) level break_context in
+      let* _, exp_type = checkexp exp level break_context in
       if
         var_type ==~ exp_type
         || match exp_type with T.NIL -> true | _ -> false
       then Ok (Tree.Const 99, T.UNIT)
       else Error (`AssignmentTypesDontmatch z)
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
-      let* _, lo_type = checkexp lo level in
-      let* _, hi_type = checkexp hi level in
+      let* _, lo_type = checkexp lo level break_context in
+      let* _, hi_type = checkexp hi level break_context in
 
       let new_vars =
         S.enter (S.symbol var)
@@ -319,7 +327,10 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
              { access = Translate.alloc_local true level; ty = T.INT })
           vars
       in
-      let* _, body_type = typecheck new_vars types body level in
+      let done_label = Temp.new_label () in
+      let* _, body_type =
+        typecheck new_vars types body level (Some done_label)
+      in
 
       match (resolv lo_type, resolv hi_type, resolv body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var ->
@@ -359,7 +370,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
             Ok (vars, types_with_headers)
         | A.VarDec { name; escape = _; typ; init; pos = _ } ->
-            let* _, init_ty = typecheck vars types init level in
+            let* _, init_ty = typecheck vars types init level break_context in
             let* var_ty =
               match typ with
               | None when resolv init_ty <>~ T.NIL -> Ok init_ty
@@ -451,7 +462,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                   vars_with_headers formals params
               in
 
-              let* _, actual_body_ty = typecheck bound_args types body level in
+              let* _, actual_body_ty =
+                typecheck bound_args types body level break_context
+              in
               if ty_eq actual_body_ty expected_result_ty then Ok ()
               else Error (`FunctionTypeAnnotationDoesntMatchExpression z)
             in
@@ -471,7 +484,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
 
       let* new_vars, new_types = checkdecs vars types decs in
-      let* _, body_type = typecheck new_vars new_types body level in
+      let* _, body_type =
+        typecheck new_vars new_types body level break_context
+      in
       Ok (Tree.Const 99, body_type)
 
 let typecheckProg' (p : Absyn.exp) =
@@ -515,7 +530,7 @@ let typecheckProg' (p : Absyn.exp) =
     |> Symbol.enter (Symbol.symbol "int") T.INT
     |> Symbol.enter (Symbol.symbol "string") T.STRING
   in
-  let* _typechecked, _type = typecheck vars types p Outermost in
+  let* _typechecked, _type = typecheck vars types p Outermost None in
   Ok ()
 
 exception IDKBro of string

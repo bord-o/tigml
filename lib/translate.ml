@@ -17,6 +17,8 @@ let level_eq a b =
 
 type access = level * Frame.access [@@deriving show]
 
+type break_context = Temp.label option
+
 let global_fragments : Frame.fragment list ref = ref []
 let outermost = Outermost
 let outermost_frame = Frame.new_frame (Temp.named_label "main") []
@@ -103,14 +105,23 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
              ++ Label done_label,
              Temp result ))
 
-(*
-    TODO: IR gen
-    TODO: How do breaks work here?
- *)
-let while' (test : exp) (body : exp) =
-  let done_label = Temp.new_label () in
+let break' (break_context : break_context) (pos : Absyn.pos) =
+  match break_context with
+  | None -> Error (`BreakUsedOutsideOfLoop pos) (* This should be caught in semantic analysis *)
+  | Some exit_label -> Ok (ESeq (Jump (Name exit_label, [ exit_label ]), Const 0))
+
+let while' (test : exp) (body : exp) (done_label : Temp.label) =
+  let test_label = Temp.new_label () in
   let body_label = Temp.new_label () in
-  Ok (Const 99)
+  Ok
+    (ESeq
+       ( Label test_label
+         ++ CJump (EQ, test, Const 0, done_label, body_label)
+         ++ Label body_label
+         ++ Exp body
+         ++ Jump (Name test_label, [ test_label ])
+         ++ Label done_label,
+         Const 0 ))
 
 (* TODO: Test this*)
 let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
@@ -176,7 +187,8 @@ let simple_var (access : access) ty (use_level : level) =
   | Frame.InFrame offset when level_eq dec_level use_level ->
       Ok (Mem (Binop (Plus, Temp Frame.fp, Const offset)))
   | Frame.InFrame offset ->
-      traverse_static_links ~dec_level ~use_level (Temp Frame.fp)
+      let* target_fp = traverse_static_links ~dec_level ~use_level (Temp Frame.fp) in
+      Ok (Mem (Binop (Plus, target_fp, Const offset)))
 
 let static_link_for_call ~(callee_level : level) ~(current_level : level) =
   match callee_level with
