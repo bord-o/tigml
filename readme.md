@@ -7,11 +7,11 @@ something working that isn't a total mess.
 
 
 ## TODOs
-[ ] ArrayExp
-[ ] RecordExp
 [ ] LetExp
     [ ] VarDec
     [ ] FunDec
+[ x ] ArrayExp
+[ x ] RecordExp
 [ x ] FieldVar
 [ x ] SubscriptVar
 [ x ] WhileExp

@@ -192,10 +192,10 @@ ESeq(
 - **Assignment expressions**: Complete IR for simple, field, and subscript assignment
 - **Array/Record access**: Field and subscript variable reading operations
 - **Memory addressing**: Proper field offsets and array indexing
-
-### 🚧 Remaining for Core IR Generation
 - **Array creation** (`ArrayExp`): Memory allocation and initialization
 - **Record creation** (`RecordExp`): Memory allocation and field initialization  
+
+### 🚧 Remaining for Core IR Generation
 - **Let expressions** (`LetExp`): Variable and function declarations with scoping
 - **Function calls**: Static link calculation implemented but needs testing
 
@@ -206,9 +206,7 @@ ESeq(
 
 ## Next Steps for Implementation
 
-1. **Array creation**: `array[size] of init` → heap allocation + initialization loop
-2. **Record creation**: `{field1=val1, field2=val2}` → heap allocation + field assignment
-3. **Let expressions**: Variable declarations with proper scoping
-4. **Test function calls**: Verify static link passing works correctly
+1. **Let expressions**: Variable declarations with proper scoping
+2. **Test function calls**: Verify static link passing works correctly
 
 This architecture provides the foundation for generating correct IR code that properly handles Tiger's lexical scoping through static links and maintains the stack discipline required for function calls.
