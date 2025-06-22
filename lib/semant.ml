@@ -156,7 +156,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           let* ir = Translate.simple_var access ty level in
           Ok (ir, ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
-      let* _, record_type = checkexp (A.VarExp var) level break_context in
+      let* record_ir, record_type = checkexp (A.VarExp var) level break_context in
       match resolv record_type with
       | T.RECORD (fields, _r) ->
           let* field_ty =
@@ -164,13 +164,16 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             |> List.assoc_opt (S.symbol sym)
             |> Option.to_result ~none:(`RecordFieldDoesntExist z)
           in
-          Ok (Tree.Const 99, field_ty)
+          let* ir = Translate.field_var record_ir (S.symbol sym) fields in
+          Ok (ir, field_ty)
       | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
   | A.VarExp (A.SubscriptVar (var, exp', _)) as z -> (
-      let* _, array_type = checkexp (A.VarExp var) level break_context in
-      let* _, index_type = checkexp exp' level break_context in
+      let* array_ir, array_type = checkexp (A.VarExp var) level break_context in
+      let* index_ir, index_type = checkexp exp' level break_context in
       match (resolv array_type, resolv index_type) with
-      | T.ARRAY (under_type, _r), T.INT -> Ok (Tree.Const 99, under_type)
+      | T.ARRAY (under_type, _r), T.INT -> 
+          let* ir = Translate.subscript_var array_ir index_ir in
+          Ok (ir, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
       | T.ARRAY _, _ -> Error (`SubscriptMustBeInteger z)
       | _ -> Error (`SubscriptNonArrayAndNonIntegerIndex z))
@@ -309,32 +312,77 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           in
           check_fields (fields, found_fields)
       | _ -> Error (`RecordTypeNotRecord z))
-  | A.AssignExp { var; exp; _ } as z ->
-      let* _, var_type = checkexp (A.VarExp var) level break_context in
-      let* _, exp_type = checkexp exp level break_context in
-      if
-        var_type ==~ exp_type
-        || match exp_type with T.NIL -> true | _ -> false
-      then Ok (Tree.Const 99, T.UNIT)
-      else Error (`AssignmentTypesDontmatch z)
+  | A.AssignExp { var; exp; _ } as z -> (
+      let* exp_ir, exp_type = checkexp exp level break_context in
+      match var with
+      | A.SimpleVar (name, _) -> (
+          let* found_var =
+            S.look (S.symbol name) vars
+            |> Option.to_result ~none:(`VariableNotFound z)
+          in
+          match found_var with
+          | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
+          | Env.VarEntry { access; ty = var_type } ->
+              if
+                var_type ==~ exp_type
+                || match exp_type with T.NIL -> true | _ -> false
+              then
+                let* ir = Translate.assign access exp_ir level in
+                Ok (ir, T.UNIT)
+              else Error (`AssignmentTypesDontmatch z))
+      | A.FieldVar (record_var, field_name, _) -> (
+          let* record_ir, record_type = checkexp (A.VarExp record_var) level break_context in
+          match resolv record_type with
+          | T.RECORD (fields, _) ->
+              let* field_type =
+                fields
+                |> List.assoc_opt (S.symbol field_name)
+                |> Option.to_result ~none:(`RecordFieldDoesntExist z)
+              in
+              if
+                field_type ==~ exp_type
+                || match exp_type with T.NIL -> true | _ -> false
+              then
+                let* ir = Translate.assign_field record_ir (S.symbol field_name) fields exp_ir in
+                Ok (ir, T.UNIT)
+              else Error (`AssignmentTypesDontmatch z)
+          | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
+      | A.SubscriptVar (array_var, index_exp, _) -> (
+          let* array_ir, array_type = checkexp (A.VarExp array_var) level break_context in
+          let* index_ir, index_type = checkexp index_exp level break_context in
+          match (resolv array_type, resolv index_type) with
+          | T.ARRAY (element_type, _), T.INT ->
+              if
+                element_type ==~ exp_type
+                || match exp_type with T.NIL -> true | _ -> false
+              then
+                let* ir = Translate.assign_subscript array_ir index_ir exp_ir in
+                Ok (ir, T.UNIT)
+              else Error (`AssignmentTypesDontmatch z)
+          | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
+          | T.ARRAY _, _ -> Error (`SubscriptMustBeInteger z)
+          | _ -> Error (`SubscriptNonArrayAndNonIntegerIndex z)))
   | A.ForExp { var; escape = _; lo; hi; body; _ } as z -> (
       let* _, lo_type = checkexp lo level break_context in
       let* _, hi_type = checkexp hi level break_context in
 
+      let var_access = Translate.alloc_local true level in
       let new_vars =
         S.enter (S.symbol var)
-          (Env.VarEntry
-             { access = Translate.alloc_local true level; ty = T.INT })
+          (Env.VarEntry { access = var_access; ty = T.INT })
           vars
       in
       let done_label = Temp.new_label () in
-      let* _, body_type =
+      let* body_ir, body_type =
         typecheck new_vars types body level (Some done_label)
       in
+      let* lo_ir, _ = checkexp lo level break_context in
+      let* hi_ir, _ = checkexp hi level break_context in
 
       match (resolv lo_type, resolv hi_type, resolv body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var ->
-          Ok (Tree.Const 99, T.UNIT)
+          let* ir = Translate.for' var_access lo_ir hi_ir body_ir done_label level in
+          Ok (ir, T.UNIT)
       | T.INT, T.INT, T.UNIT -> Error (`CantReassignForLoopVariable z)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
       | _, _, _ -> Error (`ForLoopBodyReturnsValue z))

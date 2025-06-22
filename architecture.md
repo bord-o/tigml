@@ -182,35 +182,33 @@ ESeq(
 - Basic frame management and stack allocation
 - Static link infrastructure and traversal
 - Level-based scope representation
-- Simple variable access for same-level variables
+- **Complete variable access** with static link traversal for all scoping levels
 - Basic arithmetic and comparison operations
 - Conditional expressions (if-then-else)
+- **While loops**: Complete IR generation with proper break context
+- **For loops**: Complete IR generation with loop variable management
+- **Break statements**: Proper jump to enclosing loop exit labels
+- **Break context threading**: Throughout semantic analysis
+- **Assignment expressions**: Complete IR for simple, field, and subscript assignment
+- **Array/Record access**: Field and subscript variable reading operations
+- **Memory addressing**: Proper field offsets and array indexing
 
-### 🚧 In Progress / TODO
-- **Variable Access**: `simple_var` returns placeholder `Const 99`
-- **While Loops**: Stub implementation 
-- **Function Calls**: Static link calculation implemented but needs testing
-- **Array/Record Access**: Not implemented
-- **Break Statements**: Loop context tracking needed
+### 🚧 Remaining for Core IR Generation
+- **Array creation** (`ArrayExp`): Memory allocation and initialization
+- **Record creation** (`RecordExp`): Memory allocation and field initialization  
+- **Let expressions** (`LetExp`): Variable and function declarations with scoping
+- **Function calls**: Static link calculation implemented but needs testing
 
-### 🔧 Key Areas Needing Attention
-
-1. **Complete `simple_var` Implementation** (`translate.ml:172-179`):
-   - Currently returns placeholder values
-   - Static link traversal is implemented but not used
-
-2. **Loop Control Flow** (`translate.ml:110-113`):
-   - Break statement handling
-   - Loop label management
-
-3. **Testing**: Most IR generation functions lack comprehensive testing
+### 🔧 Advanced Features (Future)
+- **String operations**: Concatenation and comparison
+- **Runtime system**: Memory management, garbage collection
+- **Optimization**: Register allocation, dead code elimination
 
 ## Next Steps for Implementation
 
-1. **Fix `simple_var`**: Use the static link traversal properly
-2. **Implement `while` loops**: Use label/jump pattern
-3. **Add break statement support**: Track loop exit labels
+1. **Array creation**: `array[size] of init` → heap allocation + initialization loop
+2. **Record creation**: `{field1=val1, field2=val2}` → heap allocation + field assignment
+3. **Let expressions**: Variable declarations with proper scoping
 4. **Test function calls**: Verify static link passing works correctly
-5. **Implement let expressions**: Variable declarations with proper scoping
 
 This architecture provides the foundation for generating correct IR code that properly handles Tiger's lexical scoping through static links and maintains the stack discipline required for function calls.

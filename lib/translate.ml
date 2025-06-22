@@ -16,7 +16,6 @@ let level_eq a b =
   | _ -> false
 
 type access = level * Frame.access [@@deriving show]
-
 type break_context = Temp.label option
 
 let global_fragments : Frame.fragment list ref = ref []
@@ -51,16 +50,6 @@ let new_string s =
   global_fragments := frag :: !global_fragments;
   Tree.Name lab
 
-(* TODO *)
-let simple_var venv tenv (access : access) : exp =
-  (* Level has a frame and parent leve, access is a reg or temp *)
-  let level, frame_access = access in
-  match (level, frame_access) with
-  | Level l, InFrame n -> Tree.Const 99
-  | Level l, InReg temp -> Tree.Const 99
-  | Outermost, InFrame n -> Tree.Const 99
-  | Outermost, InReg temp -> Tree.Const 99
-
 let map_binop = function
   | Absyn.PlusOp -> Ok Tree.Plus
   | Absyn.MinusOp -> Ok Tree.Minus
@@ -78,6 +67,40 @@ let map_relop = function
   | _ -> Error `CantTreatRelopAsBinop
 
 let ( ++ ) s1 s2 = Seq (s1, s2)
+
+(* TODO: Test this*)
+(* Here lg is where the variable is declared and lf is where its used *)
+let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
+  if level_eq dec_level use_level then
+    (* Same level - just return the frame pointer *)
+    Ok fp
+  else
+    match use_level with
+    | Outermost -> Ok fp
+    | Level l -> (
+        (* Get the static link from the current frame *)
+        let current_frame = l.frame in
+        let static_link = List.hd (Frame.formals current_frame) in
+        match static_link with
+        | Frame.InReg _ -> Error (`StaticLinkShouldNotBeInReg current_frame)
+        | Frame.InFrame offset ->
+            (* Follow the static link *)
+            let static_link_addr = Mem (Binop (Plus, fp, Const offset)) in
+            traverse_static_links ~dec_level ~use_level:l.parent
+              static_link_addr)
+
+(* TODO: Test this*)
+let simple_var (access : access) ty (use_level : level) =
+  let dec_level, frame_access = access in
+  match frame_access with
+  | Frame.InReg temp -> Ok (Temp temp)
+  | Frame.InFrame offset when level_eq dec_level use_level ->
+      Ok (Mem (Binop (Plus, Temp Frame.fp, Const offset)))
+  | Frame.InFrame offset ->
+      let* target_fp =
+        traverse_static_links ~dec_level ~use_level (Temp Frame.fp)
+      in
+      Ok (Mem (Binop (Plus, target_fp, Const offset)))
 
 (* TODO: Test this*)
 (* lets just handle conditionals by setting a reg to 0 or 1 *)
@@ -107,8 +130,11 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
 
 let break' (break_context : break_context) (pos : Absyn.pos) =
   match break_context with
-  | None -> Error (`BreakUsedOutsideOfLoop pos) (* This should be caught in semantic analysis *)
-  | Some exit_label -> Ok (ESeq (Jump (Name exit_label, [ exit_label ]), Const 0))
+  | None ->
+      Error (`BreakUsedOutsideOfLoop pos)
+      (* This should be caught in semantic analysis *)
+  | Some exit_label ->
+      Ok (ESeq (Jump (Name exit_label, [ exit_label ]), Const 0))
 
 let while' (test : exp) (body : exp) (done_label : Temp.label) =
   let test_label = Temp.new_label () in
@@ -117,9 +143,24 @@ let while' (test : exp) (body : exp) (done_label : Temp.label) =
     (ESeq
        ( Label test_label
          ++ CJump (EQ, test, Const 0, done_label, body_label)
-         ++ Label body_label
-         ++ Exp body
+         ++ Label body_label ++ Exp body
          ++ Jump (Name test_label, [ test_label ])
+         ++ Label done_label,
+         Const 0 ))
+
+let for' (var_access : access) (lo : exp) (hi : exp) (body : exp)
+    (done_label : Temp.label) (current_level : level) =
+  let test_label = Temp.new_label () in
+  let body_label = Temp.new_label () in
+  let* var_exp = simple_var var_access Types.INT current_level in
+  Ok
+    (ESeq
+       ( Move (var_exp, lo) (* Initialize loop variable *)
+         ++ Label test_label
+         ++ CJump (GT, var_exp, hi, done_label, body_label) (* Test condition *)
+         ++ Label body_label ++ Exp body (* Execute body *)
+         ++ Move (var_exp, Binop (Plus, var_exp, Const 1)) (* Increment *)
+         ++ Jump (Name test_label, [ test_label ]) (* Loop back *)
          ++ Label done_label,
          Const 0 ))
 
@@ -158,38 +199,6 @@ let seq (exps : Tree.exp list) =
 let get_frame = function Outermost -> outermost_frame | Level l -> l.frame
 let get_parent = function Outermost -> None | Level l -> Some l.parent
 
-(* TODO: Test this*)
-(* Here lg is where the variable is declared and lf is where its used *)
-let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
-  if level_eq dec_level use_level then
-    (* Same level - just return the frame pointer *)
-    Ok fp
-  else
-    match use_level with
-    | Outermost -> Ok fp
-    | Level l -> (
-        (* Get the static link from the current frame *)
-        let current_frame = l.frame in
-        let static_link = List.hd (Frame.formals current_frame) in
-        match static_link with
-        | Frame.InReg _ -> Error (`StaticLinkShouldNotBeInReg current_frame)
-        | Frame.InFrame offset ->
-            (* Follow the static link *)
-            let static_link_addr = Mem (Binop (Plus, fp, Const offset)) in
-            traverse_static_links ~dec_level ~use_level:l.parent
-              static_link_addr)
-
-(* TODO: Test this*)
-let simple_var (access : access) ty (use_level : level) =
-  let dec_level, frame_access = access in
-  match frame_access with
-  | Frame.InReg temp -> Ok (Temp temp)
-  | Frame.InFrame offset when level_eq dec_level use_level ->
-      Ok (Mem (Binop (Plus, Temp Frame.fp, Const offset)))
-  | Frame.InFrame offset ->
-      let* target_fp = traverse_static_links ~dec_level ~use_level (Temp Frame.fp) in
-      Ok (Mem (Binop (Plus, target_fp, Const offset)))
-
 let static_link_for_call ~(callee_level : level) ~(current_level : level) =
   match callee_level with
   | Outermost ->
@@ -211,3 +220,28 @@ let call label (args : exp list) dec_level call_level =
   in
   let args_with_link = static_link :: args in
   Ok (Call (Name label, args_with_link))
+
+let field_var (record_exp : exp) (field_symbol : Symbol.symbol) (record_fields : (Symbol.symbol * Types.ty) list) =
+  let rec find_field_offset offset = function
+    | [] -> None
+    | (sym, _) :: rest when sym = field_symbol -> Some offset
+    | _ :: rest -> find_field_offset (offset + Frame.word_size) rest
+  in
+  match find_field_offset 0 record_fields with
+  | Some field_offset -> Ok (Mem (Binop (Plus, record_exp, Const field_offset)))
+  | None -> failwith "Field not found - should be caught in semantic analysis"
+
+let subscript_var (array_exp : exp) (index_exp : exp) =
+  Ok (Mem (Binop (Plus, array_exp, Binop (Mul, index_exp, Const Frame.word_size))))
+
+let assign (var_access : access) (exp_value : exp) (current_level : level) =
+  let* var_location = simple_var var_access Types.UNIT current_level in
+  Ok (ESeq (Move (var_location, exp_value), Const 0))
+
+let assign_field (record_exp : exp) (field_symbol : Symbol.symbol) (record_fields : (Symbol.symbol * Types.ty) list) (exp_value : exp) =
+  let* field_location = field_var record_exp field_symbol record_fields in
+  Ok (ESeq (Move (field_location, exp_value), Const 0))
+
+let assign_subscript (array_exp : exp) (index_exp : exp) (exp_value : exp) =
+  let* subscript_location = subscript_var array_exp index_exp in
+  Ok (ESeq (Move (subscript_location, exp_value), Const 0))
