@@ -253,7 +253,7 @@ let record_exp (fields : exp list) =
   let alloc_size = Const (Frame.word_size * List.length fields) in
   let alloc_loc = Temp.new_temp () in
   let alloc_ir =
-    Move (Temp alloc_loc, Frame.external_call "init_array" [ alloc_size ])
+    Move (Temp alloc_loc, Frame.external_call "init_record" [ alloc_size ])
   in
   let rec init_fields offset acc = function
     | [] -> acc
@@ -266,3 +266,9 @@ let record_exp (fields : exp list) =
           fs
   in
   ESeq (init_fields 0 alloc_ir fields, Temp alloc_loc)
+
+let array_exp ~(size : exp) ~(init : exp) =
+  let alloc_loc = Temp.new_temp () in
+  ESeq
+    ( Move (Temp alloc_loc, Frame.external_call "init_record" [ size; init ]),
+      Temp alloc_loc )

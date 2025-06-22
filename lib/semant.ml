@@ -227,8 +227,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* ir = Translate.break' break_context pos in
       Ok (ir, T.UNIT)
   | A.ArrayExp { typ; size; init; pos = _ } as z -> (
-      let* _, init_ty = checkexp init level break_context in
-      let* _, size_ty = checkexp size level break_context in
+      let* init_ir, init_ty = checkexp init level break_context in
+      let* size_ir, size_ty = checkexp size level break_context in
       let* found_type =
         S.look (S.symbol typ) types
         |> Option.to_result ~none:(`ArrayTypeNotFound z)
@@ -236,7 +236,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match (size_ty, resolv found_type) with
       | (T.INT, T.ARRAY (item_type, _)) as resolved_types
         when item_type ==~ init_ty ->
-          Ok (Tree.Const 99, snd resolved_types)
+          let ir = Translate.array_exp ~size:size_ir ~init:init_ir in
+          Ok (ir, snd resolved_types)
       | T.INT, _ -> Error (`ArrayNotTypeArray z)
       | _, _ -> Error (`ArraySizeNotInteger z))
   | A.RecordExp { fields; typ; pos = _ } as z -> (
