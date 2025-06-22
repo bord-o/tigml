@@ -248,14 +248,21 @@ let assign_subscript (array_exp : exp) (index_exp : exp) (exp_value : exp) =
   let* subscript_location = subscript_var array_exp index_exp in
   Ok (ESeq (Move (subscript_location, exp_value), Const 0))
 
+(* TODO: should this fail with 0 fields? *)
 let record_exp (fields : exp list) =
-  let alloc_size = Const (List.length fields) in
+  let alloc_size = Const (Frame.word_size * List.length fields) in
   let alloc_loc = Temp.new_temp () in
   let alloc_ir =
     Move (Temp alloc_loc, Frame.external_call "init_array" [ alloc_size ])
   in
-  let rec init_fields acc = function
+  let rec init_fields offset acc = function
     | [] -> acc
-    | f :: fs -> init_fields (acc ++ Move (Temp alloc_loc, f)) fs
+    | f :: fs ->
+        init_fields (succ offset)
+          (acc
+          ++ Move
+               ( Binop (Plus, Temp alloc_loc, Const (offset * Frame.word_size)),
+                 f ))
+          fs
   in
-  ESeq (init_fields alloc_ir fields, Temp alloc_loc)
+  ESeq (init_fields 0 alloc_ir fields, Temp alloc_loc)

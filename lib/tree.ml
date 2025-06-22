@@ -6,6 +6,7 @@ type exp =
   | Mem of exp (* wordSize bytes of memory starting at the arg address *)
   | Call of exp * exp list
   | ESeq of stm * exp
+[@@deriving show]
 
 and stm =
   | Move of exp * exp
