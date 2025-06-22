@@ -6,58 +6,6 @@ module S = Symbol
 module A = Absyn
 module T = Types
 
-type typecheck_err =
-  [ `ArrayNotTypeArray of A.exp
-  | `ArraySizeNotInteger of A.exp
-  | `ArrayTypeNotFound of A.exp
-  | `ArrayTypeTranslationNotFound of string * A.pos
-  | `AssignmentTypesDontmatch of A.exp
-  | `BreakUsedOutsideOfLoop of A.pos
-  | `CantAccessFieldOfNonRecordVariable of A.exp
-  | `CantAccessSubscriptOfNonArrayVariable of A.exp
-  | `CantDeclareNonReferenceVariableNil of A.exp
-  | `CantReassignForLoopVariable of A.exp
-  | `CantTreatRelopAsBinop
-  | `CantTreatBinopAsRelop
-  | `ExpectedFunctionFoundVar of A.exp
-  | `ExpectedVariableGotFunction of A.exp
-  | `ForLoopBodyReturnsValue of A.exp
-  | `ForLoopIndexesNotIntegers of A.exp
-  | `FunctionArgumentWrongType of A.exp
-  | `FunctionNotFound of A.exp
-  | `FunctionResultAnnotationNotFound of A.pos
-  | `FunctionTypeAnnotationDoesntMatchExpression of A.exp
-  | `IfExpBranchTypesDiffer of A.exp
-  | `IfExpTestNotAnInteger of A.exp
-  | `IllegalCycleInTypeDec
-  | `IfWithoutElseBranchMustBeUnitType of A.exp
-  | `InvalidStaticLinkTraversal
-  | `DuplicateNamesInRecursiveTypeDec
-  | `InvalidOperation of A.exp
-  | `NameTypeTranslationNotFound of string * A.pos
-  | `RecordFieldDoesntExist of A.exp
-  | `RecordFieldNamesAndTypesDontMatch of A.exp
-  | `RecordFieldNamesDontMatch of A.exp
-  | `RecordFieldTypesDontMatch of A.exp
-  | `RecordTypeNotFound of A.exp
-  | `RecordTypeNotRecord of A.exp
-  | `RecordTypeTranslatinoNotFound of string
-  | `SubscriptMustBeInteger of A.exp
-  | `SubscriptNonArrayAndNonIntegerIndex of A.exp
-  | `StaticLinkShouldNotBeInReg of Frame.frame
-  | `UnexpectedNumberOfArguments of A.exp
-  | `UnknownFunctionDecArgType
-  | `Unimplemented
-  | `VariableNotFound of A.exp
-  | `VariableTypeAnnotationDoesntMatchExpression of A.exp
-  | `VariableTypeAnnotationNotFound of A.pos
-  | `WhileBodyNotUnit of A.exp
-  | `WhileTestAndBodyWrongType of A.exp
-  | `WhileTestNotInt of A.exp
-  | `WrongNumberOfFields of A.exp ]
-[@@deriving show]
-
-(* TODO: make sure I'm using resolv appropriately everywhere *)
 let resolv = T.actual_ty
 let nullable = T.nullable_reference_types_eq
 let ty_eq = T.types_equal
@@ -68,8 +16,32 @@ let ( =~ ) = fun l r -> ty_eq l r || nullable (resolv l) (resolv r)
 let ( <>~ ) = fun l r -> not @@ ty_eq l r
 let ( let* ) = Result.bind
 
+(* TODO: finish this *)
+let assigned_in _exp' _v = false
+
+let type_of_abstract_type tenv (typ : A.ty) =
+  match typ with
+  | A.NameTy (s, pos) -> (
+      match S.look (S.symbol s) tenv with
+      | Some t -> Ok (resolv t)
+      | None -> Error (`NameTypeTranslationNotFound (s, pos)))
+  | A.ArrayTy (s, pos) -> (
+      match S.look (S.symbol s) tenv with
+      | Some t -> Ok (T.ARRAY (resolv t, ref ()))
+      | None -> Error (`ArrayTypeTranslationNotFound (s, pos)))
+  | A.RecordTy fields ->
+      let trans_field (f : A.field) =
+        match S.look (S.symbol f.typ) tenv with
+        | Some t -> Ok (S.symbol f.name, resolv t)
+        | None -> Error (`RecordTypeTranslatinoNotFound f.name)
+      in
+
+      let* internal_fields = List.map trans_field fields |> sequence_results in
+      Ok (T.RECORD (internal_fields, ref ()))
+
 exception BreakCheck of A.pos
 
+(* TODO: This is dumb, write a proper map function over my AST or figure out the ppx_deriving one  *)
 let break_check init (e : A.exp) =
   let rec aux in_loop e' =
     match e' with
@@ -119,31 +91,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
     (break_context : Translate.break_context) =
   let checkexp p level break_context =
     typecheck vars types p level break_context
-  in
-  (* TODO: finish this *)
-  let assigned_in _exp' _v = false in
-  let type_of_abstract_type tenv (typ : A.ty) =
-    match typ with
-    | A.NameTy (s, pos) -> (
-        match S.look (S.symbol s) tenv with
-        | Some t -> Ok (resolv t)
-        | None -> Error (`NameTypeTranslationNotFound (s, pos)))
-    | A.ArrayTy (s, pos) -> (
-        (* print_endline @@ Env.show_tenv tenv; *)
-        match S.look (S.symbol s) tenv with
-        | Some t -> Ok (T.ARRAY (resolv t, ref ()))
-        | None -> Error (`ArrayTypeTranslationNotFound (s, pos)))
-    | A.RecordTy fields ->
-        let trans_field (f : A.field) =
-          match S.look (S.symbol f.typ) tenv with
-          | Some t -> Ok (S.symbol f.name, resolv t)
-          | None -> Error (`RecordTypeTranslatinoNotFound f.name)
-        in
-
-        let* internal_fields =
-          List.map trans_field fields |> sequence_results
-        in
-        Ok (T.RECORD (internal_fields, ref ()))
   in
 
   match p with
@@ -604,7 +551,7 @@ let typecheckProg p =
   let res = typecheckProg' p in
   match res with
   | Ok _v -> () (*print_endline "Ok"*)
-  | Error e -> raise (IDKBro (show_typecheck_err e))
+  | Error e -> raise (IDKBro (Error.show_typecheck_err e))
 (* | Error e -> *)
 (*     print_endline "error: "; *)
 (*     print_endline @@ show_typecheck_err e *)
