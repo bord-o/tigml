@@ -12,6 +12,8 @@ type ty =
   | UNIT
 [@@deriving show]
 
+let ( let* ) = Result.bind
+
 let actual_ty start_type =
   let rec actual_ty_helper seen_types current_type =
     match current_type with
@@ -46,3 +48,37 @@ let types_equal t1 t2 =
   | ARRAY (_elem1, unique1), ARRAY (_elem2, unique2) -> unique1 == unique2
   | NAME (sym1, _), NAME (sym2, _) -> compare sym1 sym2 = 0
   | _ -> false
+
+let detect_cycles (tys : ty Symbol.table) =
+  let all_types = Symbol.table_to_list tys in
+
+  let rec follow_chain visited current_ty =
+    match current_ty with
+    | NAME (sym, { contents = Some next_ty }) ->
+        if List.mem sym visited then true
+        else follow_chain (sym :: visited) next_ty
+    | RECORD _ | ARRAY _ -> false
+    | _ -> false
+  in
+
+  List.exists (fun (_sym, ty) -> follow_chain [] ty) all_types
+
+(* *)
+let detect_duplicate_type_names (decs : Absyn.typedec list) =
+  let rec aux acc = function
+    | [] -> Ok ()
+    | (d : Absyn.typedec) :: ds ->
+        if List.mem d.name acc then Error `DuplicateNamesInRecursiveTypeDec
+        else aux (d.name :: acc) ds
+  in
+  aux [] decs
+
+(* *)
+let detect_duplicate_func_names (decs : Absyn.fundec list) =
+  let rec aux acc = function
+    | [] -> Ok ()
+    | (d : Absyn.fundec) :: ds ->
+        if List.mem d.name acc then Error `DuplicateNamesInRecursiveTypeDec
+        else aux (d.name :: acc) ds
+  in
+  aux [] decs

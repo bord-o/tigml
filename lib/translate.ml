@@ -110,13 +110,11 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
       Ok (Tree.Binop (trans_op, l, r))
   | ( Absyn.EqOp | Absyn.NeqOp | Absyn.LtOp | Absyn.LeOp | Absyn.GtOp
     | Absyn.GeOp ) as op ->
-      (* TODO *)
       let* trans_op = map_relop op in
       let true_label = Temp.new_label () in
       let false_label = Temp.new_label () in
       let done_label = Temp.new_label () in
       let result = Temp.new_temp () in
-      (* *)
       Ok
         (ESeq
            ( CJump (trans_op, l, r, true_label, false_label)
@@ -221,7 +219,8 @@ let call label (args : exp list) dec_level call_level =
   let args_with_link = static_link :: args in
   Ok (Call (Name label, args_with_link))
 
-let field_var (record_exp : exp) (field_symbol : Symbol.symbol) (record_fields : (Symbol.symbol * Types.ty) list) =
+let field_var (record_exp : exp) (field_symbol : Symbol.symbol)
+    (record_fields : (Symbol.symbol * Types.ty) list) =
   let rec find_field_offset offset = function
     | [] -> None
     | (sym, _) :: rest when sym = field_symbol -> Some offset
@@ -232,13 +231,16 @@ let field_var (record_exp : exp) (field_symbol : Symbol.symbol) (record_fields :
   | None -> failwith "Field not found - should be caught in semantic analysis"
 
 let subscript_var (array_exp : exp) (index_exp : exp) =
-  Ok (Mem (Binop (Plus, array_exp, Binop (Mul, index_exp, Const Frame.word_size))))
+  Ok
+    (Mem
+       (Binop (Plus, array_exp, Binop (Mul, index_exp, Const Frame.word_size))))
 
 let assign (var_access : access) (exp_value : exp) (current_level : level) =
   let* var_location = simple_var var_access Types.UNIT current_level in
   Ok (ESeq (Move (var_location, exp_value), Const 0))
 
-let assign_field (record_exp : exp) (field_symbol : Symbol.symbol) (record_fields : (Symbol.symbol * Types.ty) list) (exp_value : exp) =
+let assign_field (record_exp : exp) (field_symbol : Symbol.symbol)
+    (record_fields : (Symbol.symbol * Types.ty) list) (exp_value : exp) =
   let* field_location = field_var record_exp field_symbol record_fields in
   Ok (ESeq (Move (field_location, exp_value), Const 0))
 

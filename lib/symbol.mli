@@ -15,6 +15,7 @@ val name : 'a * 'b -> 'a
 
 type 'a table
 
+val table_to_list : 'a table -> (symbol * 'a) list
 val empty : 'a table
 val enter : symbol -> 'a -> 'a table -> 'a table
 val look : symbol -> 'a table -> 'a option

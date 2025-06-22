@@ -29,8 +29,10 @@ type typecheck_err =
   | `FunctionTypeAnnotationDoesntMatchExpression of A.exp
   | `IfExpBranchTypesDiffer of A.exp
   | `IfExpTestNotAnInteger of A.exp
+  | `IllegalCycleInTypeDec
   | `IfWithoutElseBranchMustBeUnitType of A.exp
   | `InvalidStaticLinkTraversal
+  | `DuplicateNamesInRecursiveTypeDec
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
   | `RecordFieldDoesntExist of A.exp
@@ -156,7 +158,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
           let* ir = Translate.simple_var access ty level in
           Ok (ir, ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
-      let* record_ir, record_type = checkexp (A.VarExp var) level break_context in
+      let* record_ir, record_type =
+        checkexp (A.VarExp var) level break_context
+      in
       match resolv record_type with
       | T.RECORD (fields, _r) ->
           let* field_ty =
@@ -171,7 +175,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       let* array_ir, array_type = checkexp (A.VarExp var) level break_context in
       let* index_ir, index_type = checkexp exp' level break_context in
       match (resolv array_type, resolv index_type) with
-      | T.ARRAY (under_type, _r), T.INT -> 
+      | T.ARRAY (under_type, _r), T.INT ->
           let* ir = Translate.subscript_var array_ir index_ir in
           Ok (ir, under_type)
       | _, T.INT -> Error (`CantAccessSubscriptOfNonArrayVariable z)
@@ -225,7 +229,6 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let* ir = Translate.if' test_ir then_ir (Const 0) in
               Ok (ir, then_ty)
             else Error (`IfWithoutElseBranchMustBeUnitType z))
-  (* TODO: call exp gets a static link i first param that points to the top of the frame (get from cur level)*)
   | A.CallExp { func; args; pos = _ } as z -> (
       match S.look (S.symbol func) vars with
       | None -> Error (`FunctionNotFound z)
@@ -331,7 +334,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                 Ok (ir, T.UNIT)
               else Error (`AssignmentTypesDontmatch z))
       | A.FieldVar (record_var, field_name, _) -> (
-          let* record_ir, record_type = checkexp (A.VarExp record_var) level break_context in
+          let* record_ir, record_type =
+            checkexp (A.VarExp record_var) level break_context
+          in
           match resolv record_type with
           | T.RECORD (fields, _) ->
               let* field_type =
@@ -343,12 +348,17 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                 field_type ==~ exp_type
                 || match exp_type with T.NIL -> true | _ -> false
               then
-                let* ir = Translate.assign_field record_ir (S.symbol field_name) fields exp_ir in
+                let* ir =
+                  Translate.assign_field record_ir (S.symbol field_name) fields
+                    exp_ir
+                in
                 Ok (ir, T.UNIT)
               else Error (`AssignmentTypesDontmatch z)
           | _ -> Error (`CantAccessFieldOfNonRecordVariable z))
       | A.SubscriptVar (array_var, index_exp, _) -> (
-          let* array_ir, array_type = checkexp (A.VarExp array_var) level break_context in
+          let* array_ir, array_type =
+            checkexp (A.VarExp array_var) level break_context
+          in
           let* index_ir, index_type = checkexp index_exp level break_context in
           match (resolv array_type, resolv index_type) with
           | T.ARRAY (element_type, _), T.INT ->
@@ -381,7 +391,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
 
       match (resolv lo_type, resolv hi_type, resolv body_type) with
       | T.INT, T.INT, T.UNIT when not @@ assigned_in body var ->
-          let* ir = Translate.for' var_access lo_ir hi_ir body_ir done_label level in
+          let* ir =
+            Translate.for' var_access lo_ir hi_ir body_ir done_label level
+          in
           Ok (ir, T.UNIT)
       | T.INT, T.INT, T.UNIT -> Error (`CantReassignForLoopVariable z)
       | _, _, T.UNIT -> Error (`ForLoopIndexesNotIntegers z)
@@ -389,6 +401,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
   | A.LetExp { decs; body; _ } as z ->
       let checkdec vars types = function
         | A.TypeDec tydecs ->
+            let* () = T.detect_duplicate_type_names tydecs in
+
             let add_type_header ty_env tydec =
               let A.{ name; ty = _; _ } = tydec in
               let placeholder = T.NAME (S.symbol name, ref None) in
@@ -415,8 +429,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               |> List.map (resolve_type_definition types_with_headers)
               |> sequence_results
             in
-
-            Ok (vars, types_with_headers)
+            if T.detect_cycles types_with_headers then
+              Error `IllegalCycleInTypeDec
+            else Ok (vars, types_with_headers)
         | A.VarDec { name; escape = _; typ; init; pos = _ } ->
             let* _, init_ty = typecheck vars types init level break_context in
             let* var_ty =
@@ -438,6 +453,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             Ok (new_vars, types)
         | A.FunctionDec fundecs ->
+            let* () = T.detect_duplicate_func_names fundecs in
             let extract_formals params =
               params
               |> List.map (fun (f : A.field) ->

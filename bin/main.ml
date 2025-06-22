@@ -19,8 +19,7 @@ let () =
       ("test13.tig", false);
       ("test14.tig", false);
       ("test15.tig", false);
-      (* ("test16.tig", false); *)
-      (* TODO: fix mutual recursive type cycle *)
+      ("test16.tig", false);
       ("test17.tig", false);
       ("test18.tig", false);
       ("test19.tig", false);
@@ -42,10 +41,8 @@ let () =
       ("test35.tig", false);
       ("test36.tig", false);
       ("test37.tig", true);
-      (* ("test38.tig", false);  *)
-      (* TODO: Fix duplicate name in recursive types*)
-      (* ("test39.tig", false); *)
-      (* TODO: Fix duplicate name in recursive functions *)
+      ("test38.tig", false);
+      ("test39.tig", false);
       ("test40.tig", false);
       ("test41.tig", true);
       ("test42.tig", true);
