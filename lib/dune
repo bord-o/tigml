@@ -1,5 +1,8 @@
 (library
  (name tigml)
+ (inline_tests
+ (deps (source_tree ../test_programs))
+   )
  (preprocess
   (pps
    ppx_deriving.show
@@ -7,7 +10,11 @@
    ppx_deriving.ord
    ppx_deriving.map
    ppx_deriving.fold
-   ppx_deriving.iter)))
+   ppx_deriving.iter
+   ppx_inline_test
+   )
+  )
+ )
 
 (ocamllex lexer)
 

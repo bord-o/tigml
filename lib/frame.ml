@@ -57,6 +57,11 @@ let alloc_local frame _escapes =
   let access = InFrame offset in
   access
 
+(* TODO: Do I need to modify this for static links or calling conventions?*)
+let external_call (f : string) (args : Tree.exp list) : Tree.exp =
+  let open Tree in
+  Call (Name (Temp.named_label f), args)
+
 let exp (a : access) e =
   let open Tree in
   match a with

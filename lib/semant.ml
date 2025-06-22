@@ -102,7 +102,7 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       match found_var with
       | Env.FunEntry _ -> Error (`ExpectedVariableGotFunction z)
       | Env.VarEntry { access; ty } ->
-          let* ir = Translate.simple_var access ty level in
+          let* ir = Translate.simple_var access level in
           Ok (ir, ty))
   | A.VarExp (A.FieldVar (var, sym, _)) as z -> (
       let* record_ir, record_type =
@@ -246,21 +246,25 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
       in
       match resolv found_type with
       | T.RECORD (found_fields, _r) ->
-          let rec check_fields = function
-            | [], [] -> Ok (Tree.Const 99, found_type)
+          let rec check_fields acc = function
+            | [], [] -> Ok (acc, found_type)
             | _v, [] -> Error (`WrongNumberOfFields z)
             | [], _v -> Error (`WrongNumberOfFields z)
             | (name', exp', _) :: ls, (r_sym, r_ty) :: rs -> (
                 let l_sym = S.symbol name' in
-                let* _, l_ty = checkexp exp' level break_context in
+                let* l_ir, l_ty = checkexp exp' level break_context in
                 let types_compatible l_ty r_ty = l_ty =~ r_ty in
                 match (l_sym = r_sym, types_compatible l_ty r_ty) with
-                | true, true -> check_fields (ls, rs)
+                | true, true -> check_fields (acc @ [ l_ir ]) (ls, rs)
                 | false, true -> Error (`RecordFieldNamesDontMatch z)
                 | true, false -> Error (`RecordFieldTypesDontMatch z)
                 | false, false -> Error (`RecordFieldNamesAndTypesDontMatch z))
           in
-          check_fields (fields, found_fields)
+          let* resulting_fields, found_type =
+            check_fields [] (fields, found_fields)
+          in
+          let ir = Translate.record_exp resulting_fields in
+          Ok (ir, found_type)
       | _ -> Error (`RecordTypeNotRecord z))
   | A.AssignExp { var; exp; _ } as z -> (
       let* exp_ir, exp_type = checkexp exp level break_context in

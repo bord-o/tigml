@@ -7,17 +7,17 @@ something working that isn't a total mess.
 
 
 ## TODOs
-[ ] WhileExp
-[ ] BreakExp
 [ ] ArrayExp
 [ ] RecordExp
-[ ] AssignExp
-[ ] ForExp
 [ ] LetExp
     [ ] VarDec
     [ ] FunDec
-[ ] FieldVar
-[ ] SubscriptVar
+[ x ] FieldVar
+[ x ] SubscriptVar
+[ x ] WhileExp
+[ x ] BreakExp
+[ x ] AssignExp
+[ x ] ForExp
 [ x ] SimpleVar
 [ x ] NilExp
 [ x ] IntExp

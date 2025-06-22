@@ -12,7 +12,7 @@ type level =
 let level_eq a b =
   match (a, b) with
   | Outermost, Outermost -> true
-  | Level { unique = u1 }, Level { unique = u2 } when u1 = u2 -> true
+  | Level { unique = u1; _ }, Level { unique = u2; _ } when u1 = u2 -> true
   | _ -> false
 
 type access = level * Frame.access [@@deriving show]
@@ -90,7 +90,7 @@ let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
               static_link_addr)
 
 (* TODO: Test this*)
-let simple_var (access : access) ty (use_level : level) =
+let simple_var (access : access) (use_level : level) =
   let dec_level, frame_access = access in
   match frame_access with
   | Frame.InReg temp -> Ok (Temp temp)
@@ -150,7 +150,7 @@ let for' (var_access : access) (lo : exp) (hi : exp) (body : exp)
     (done_label : Temp.label) (current_level : level) =
   let test_label = Temp.new_label () in
   let body_label = Temp.new_label () in
-  let* var_exp = simple_var var_access Types.INT current_level in
+  let* var_exp = simple_var var_access current_level in
   Ok
     (ESeq
        ( Move (var_exp, lo) (* Initialize loop variable *)
@@ -223,7 +223,7 @@ let field_var (record_exp : exp) (field_symbol : Symbol.symbol)
     (record_fields : (Symbol.symbol * Types.ty) list) =
   let rec find_field_offset offset = function
     | [] -> None
-    | (sym, _) :: rest when sym = field_symbol -> Some offset
+    | (sym, _) :: _ when sym = field_symbol -> Some offset
     | _ :: rest -> find_field_offset (offset + Frame.word_size) rest
   in
   match find_field_offset 0 record_fields with
@@ -236,7 +236,7 @@ let subscript_var (array_exp : exp) (index_exp : exp) =
        (Binop (Plus, array_exp, Binop (Mul, index_exp, Const Frame.word_size))))
 
 let assign (var_access : access) (exp_value : exp) (current_level : level) =
-  let* var_location = simple_var var_access Types.UNIT current_level in
+  let* var_location = simple_var var_access current_level in
   Ok (ESeq (Move (var_location, exp_value), Const 0))
 
 let assign_field (record_exp : exp) (field_symbol : Symbol.symbol)
@@ -247,3 +247,15 @@ let assign_field (record_exp : exp) (field_symbol : Symbol.symbol)
 let assign_subscript (array_exp : exp) (index_exp : exp) (exp_value : exp) =
   let* subscript_location = subscript_var array_exp index_exp in
   Ok (ESeq (Move (subscript_location, exp_value), Const 0))
+
+let record_exp (fields : exp list) =
+  let alloc_size = Const (List.length fields) in
+  let alloc_loc = Temp.new_temp () in
+  let alloc_ir =
+    Move (Temp alloc_loc, Frame.external_call "init_array" [ alloc_size ])
+  in
+  let rec init_fields acc = function
+    | [] -> acc
+    | f :: fs -> init_fields (acc ++ Move (Temp alloc_loc, f)) fs
+  in
+  ESeq (init_fields alloc_ir fields, Temp alloc_loc)
