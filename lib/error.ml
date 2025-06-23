@@ -31,6 +31,7 @@ type typecheck_err =
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
   | `NoDeclarations
+  | `NoFunctionBodies
   | `RecordFieldDoesntExist of A.exp
   | `RecordFieldNamesAndTypesDontMatch of A.exp
   | `RecordFieldNamesDontMatch of A.exp

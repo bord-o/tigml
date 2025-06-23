@@ -435,12 +435,13 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let* result_ty = extract_result_type result in
               let sym = S.symbol name in
               let f_level = Translate.new_level level sym escaping_params in
+              let f_label = Temp.named_label fundec.name in
               let fe =
                 Env.FunEntry
                   {
                     formals;
                     result = result_ty;
-                    label = Temp.named_label fundec.name;
+                    label = f_label;
                     level = f_level;
                   }
               in
@@ -473,26 +474,35 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               let bound_args =
                 List.fold_left2
                   (fun body_vars ty (field : A.field) ->
-                    let ve =
-                      Env.VarEntry
-                        { access = Translate.alloc_local true fun_level; ty }
-                    in
+                    let arg_access = Translate.alloc_local true fun_level in
+                    let ve = Env.VarEntry { access = arg_access; ty } in
                     S.enter (S.symbol field.name) ve body_vars)
                   vars_with_headers formals params
               in
 
-              let* _, actual_body_ty =
+              let* body_ir, actual_body_ty =
                 typecheck bound_args types body level break_context
               in
-              if ty_eq actual_body_ty expected_result_ty then Ok ()
+
+              let wrapped_body_ir =
+                let frame' =
+                  match fun_level with
+                  | Outermost -> Translate.outermost_frame
+                  | Level l -> l.frame
+                in
+
+                Frame.proc_entry_exit_1 frame' (Tree.Exp body_ir)
+              in
+
+              if ty_eq actual_body_ty expected_result_ty then Ok wrapped_body_ir
               else Error (`FunctionTypeAnnotationDoesntMatchExpression z)
             in
 
-            let* _ =
+            let* body_ir_chunks =
               fundecs |> List.map check_function_body |> sequence_results
             in
-
-            Ok (Some (Tree.Exp (Tree.Const 99)), vars_with_headers, types)
+            let* body_seq = Translate.fun_dec_bodies body_ir_chunks in
+            Ok (Some body_seq, vars_with_headers, types)
       in
 
       let rec checkdecs acc vars types = function

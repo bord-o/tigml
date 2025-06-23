@@ -27,6 +27,8 @@ type frame = {
 }
 [@@deriving show]
 
+let proc_entry_exit_1 (_frame : frame) (stm : Tree.stm) = stm
+
 type fragment =
   | String of Temp.label * string
   | Proc of { body : Tree.stm; frame : frame }

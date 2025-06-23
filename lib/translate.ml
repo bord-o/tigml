@@ -285,3 +285,11 @@ let let_exp (decs : stm list) (body : exp) =
   match reduce ( ++ ) decs with
   | Some sequenced -> Ok (ESeq (sequenced, body))
   | None -> Ok body
+
+let fun_dec_bodies (decs : stm list) =
+  let reduce f l =
+    match l with [] -> None | x :: xs -> Some (xs |> List.fold_left f x)
+  in
+  match reduce ( ++ ) decs with
+  | Some sequenced -> Ok sequenced
+  | None -> Error `NoFunctionBodies
