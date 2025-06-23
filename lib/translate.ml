@@ -68,12 +68,8 @@ let map_relop = function
 
 let ( ++ ) s1 s2 = Seq (s1, s2)
 
-(* TODO: Test this*)
-(* Here lg is where the variable is declared and lf is where its used *)
 let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
-  if level_eq dec_level use_level then
-    (* Same level - just return the frame pointer *)
-    Ok fp
+  if level_eq dec_level use_level then Ok fp
   else
     match use_level with
     | Outermost -> Ok fp
@@ -89,7 +85,6 @@ let rec traverse_static_links ~(dec_level : level) ~(use_level : level) fp =
             traverse_static_links ~dec_level ~use_level:l.parent
               static_link_addr)
 
-(* TODO: Test this*)
 let simple_var (access : access) (use_level : level) =
   let dec_level, frame_access = access in
   match frame_access with
@@ -102,7 +97,6 @@ let simple_var (access : access) (use_level : level) =
       in
       Ok (Mem (Binop (Plus, target_fp, Const offset)))
 
-(* TODO: Test this*)
 (* lets just handle conditionals by setting a reg to 0 or 1 *)
 let operation (l : Tree.exp) (r : Tree.exp) = function
   | (Absyn.PlusOp | Absyn.MinusOp | Absyn.TimesOp | Absyn.DivideOp) as op ->
@@ -128,9 +122,7 @@ let operation (l : Tree.exp) (r : Tree.exp) = function
 
 let break' (break_context : break_context) (pos : Absyn.pos) =
   match break_context with
-  | None ->
-      Error (`BreakUsedOutsideOfLoop pos)
-      (* This should be caught in semantic analysis *)
+  | None -> Error (`BreakUsedOutsideOfLoop pos)
   | Some exit_label ->
       Ok (ESeq (Jump (Name exit_label, [ exit_label ]), Const 0))
 
@@ -153,16 +145,15 @@ let for' (var_access : access) (lo : exp) (hi : exp) (body : exp)
   let* var_exp = simple_var var_access current_level in
   Ok
     (ESeq
-       ( Move (var_exp, lo) (* Initialize loop variable *)
+       ( Move (var_exp, lo)
          ++ Label test_label
-         ++ CJump (GT, var_exp, hi, done_label, body_label) (* Test condition *)
-         ++ Label body_label ++ Exp body (* Execute body *)
-         ++ Move (var_exp, Binop (Plus, var_exp, Const 1)) (* Increment *)
-         ++ Jump (Name test_label, [ test_label ]) (* Loop back *)
+         ++ CJump (GT, var_exp, hi, done_label, body_label)
+         ++ Label body_label ++ Exp body
+         ++ Move (var_exp, Binop (Plus, var_exp, Const 1))
+         ++ Jump (Name test_label, [ test_label ])
          ++ Label done_label,
          Const 0 ))
 
-(* TODO: Test this*)
 let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
   let true_label = Temp.new_label () in
   let false_label = Temp.new_label () in
@@ -179,13 +170,12 @@ let if' (test : Tree.exp) (then' : Tree.exp) (else' : Tree.exp) =
          ++ Label done_label,
          Temp result ))
 
-(* TODO: Test this*)
 let seq (exps : Tree.exp list) =
   match List.rev exps with
   | [] -> Const 0
   | last :: rest ->
       let build_seq_stmt = function
-        | [] -> Exp (Const 0) (* Could also use a no-op statement *)
+        | [] -> Exp (Const 0)
         | exps ->
             let stmts = List.map (fun e -> Exp e) exps in
             List.fold_left
@@ -200,18 +190,12 @@ let get_parent = function Outermost -> None | Level l -> Some l.parent
 let static_link_for_call ~(callee_level : level) ~(current_level : level) =
   match callee_level with
   | Outermost ->
-      (* Even outermost functions need a static link to access globals *)
-      (* The static link should point to the outermost_frame *)
       traverse_static_links ~dec_level:Outermost ~use_level:current_level
         (Temp Frame.fp)
   | Level { parent; _ } ->
-      (* Find the frame pointer of the callee's parent *)
       traverse_static_links ~dec_level:parent ~use_level:current_level
         (Temp Frame.fp)
 
-(*
-    Need to find the level of the enclosing environment  of the function and pass a pointer to that so that the function body can access variables at that level
-*)
 let call label (args : exp list) dec_level call_level =
   let* static_link =
     static_link_for_call ~callee_level:dec_level ~current_level:call_level
@@ -248,7 +232,6 @@ let assign_subscript (array_exp : exp) (index_exp : exp) (exp_value : exp) =
   let* subscript_location = subscript_var array_exp index_exp in
   Ok (ESeq (Move (subscript_location, exp_value), Const 0))
 
-(* TODO: should this fail with 0 fields? *)
 let record_exp (fields : exp list) =
   let alloc_size = Const (Frame.word_size * List.length fields) in
   let alloc_loc = Temp.new_temp () in
@@ -270,14 +253,13 @@ let record_exp (fields : exp list) =
 let array_exp ~(size : exp) ~(init : exp) =
   let alloc_loc = Temp.new_temp () in
   ESeq
-    ( Move (Temp alloc_loc, Frame.external_call "init_record" [ size; init ]),
+    ( Move (Temp alloc_loc, Frame.external_call "init_array" [ size; init ]),
       Temp alloc_loc )
 
 let var_dec (alloc_loc : access) level (init_ir : exp) =
   let* var_ir = simple_var alloc_loc level in
   Ok (Move (var_ir, init_ir))
 
-(* If we don't have any function decs or variable decs we just return body IR *)
 let let_exp (decs : stm list) (body : exp) =
   let reduce f l =
     match l with [] -> None | x :: xs -> Some (xs |> List.fold_left f x)

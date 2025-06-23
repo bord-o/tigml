@@ -39,7 +39,7 @@ let nullable_reference_types_eq t1 t2 =
 
 let types_equal t1 t2 =
   let t1, t2 = (actual_ty t1, actual_ty t2) in
-  match (actual_ty t1, actual_ty t2) with
+  match (t1, t2) with
   | INT, INT -> true
   | STRING, STRING -> true
   | UNIT, UNIT -> true
@@ -78,7 +78,7 @@ let detect_duplicate_func_names (decs : Absyn.fundec list) =
   let rec aux acc = function
     | [] -> Ok ()
     | (d : Absyn.fundec) :: ds ->
-        if List.mem d.name acc then Error `DuplicateNamesInRecursiveTypeDec
+        if List.mem d.name acc then Error `DuplicateNamesInRecursiveFuncDec
         else aux (d.name :: acc) ds
   in
   aux [] decs

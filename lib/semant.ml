@@ -16,8 +16,48 @@ let ( =~ ) = fun l r -> ty_eq l r || nullable (resolv l) (resolv r)
 let ( <>~ ) = fun l r -> not @@ ty_eq l r
 let ( let* ) = Result.bind
 
-(* TODO: finish this *)
-let assigned_in _exp' _v = false
+(* TODO: This is dumb, write a proper map function over my AST or figure out the ppx_deriving one  *)
+let assigned_in exp var_name =
+  let rec check_exp = function
+    | A.AssignExp { var = A.SimpleVar (name, _); _ } when name = var_name ->
+        true
+    | A.AssignExp { var = A.FieldVar (v, _, _); exp; _ } ->
+        check_var v || check_exp exp
+    | A.AssignExp { var = A.SubscriptVar (v, idx, _); exp; _ } ->
+        check_var v || check_exp idx || check_exp exp
+    | A.AssignExp { exp; _ } -> check_exp exp
+    | A.VarExp v -> check_var v
+    | A.OpExp { left; right; _ } -> check_exp left || check_exp right
+    | A.RecordExp { fields; _ } ->
+        fields |> List.exists (fun (_, e, _) -> check_exp e)
+    | A.ArrayExp { size; init; _ } -> check_exp size || check_exp init
+    | A.SeqExp exps -> exps |> List.exists (fun (e, _) -> check_exp e)
+    | A.IfExp { test; then'; else'; _ } -> (
+        check_exp test || check_exp then'
+        || match else' with Some e -> check_exp e | None -> false)
+    | A.WhileExp { test; body; _ } -> check_exp test || check_exp body
+    | A.ForExp { var; lo; hi; body; _ } when var = var_name ->
+        check_exp lo || check_exp hi || check_exp body
+    | A.ForExp { lo; hi; body; _ } ->
+        check_exp lo || check_exp hi || check_exp body
+    | A.LetExp { decs; body; _ } -> check_decs decs || check_exp body
+    | A.CallExp { args; _ } -> args |> List.exists check_exp
+    | A.StringExp _ | A.IntExp _ | A.NilExp | A.BreakExp _ -> false
+  and check_var = function
+    | A.SimpleVar (name, _) when name = var_name -> false
+    | A.FieldVar (v, _, _) -> check_var v
+    | A.SubscriptVar (v, idx, _) -> check_var v || check_exp idx
+    | _ -> false
+  and check_decs = function
+    | [] -> false
+    | A.VarDec { init; _ } :: ds -> check_exp init || check_decs ds
+    | A.FunctionDec fundecs :: ds ->
+        fundecs
+        |> List.exists (fun (fundec : A.fundec) -> check_exp fundec.body)
+        || check_decs ds
+    | A.TypeDec _ :: ds -> check_decs ds
+  in
+  check_exp exp
 
 let type_of_abstract_type tenv (typ : A.ty) =
   match typ with
@@ -571,8 +611,5 @@ let typecheckProg p =
   break_check false p;
   let res = typecheckProg' p in
   match res with
-  | Ok _v -> () (*print_endline "Ok"*)
+  | Ok _v -> ()
   | Error e -> raise (IDKBro (Error.show_typecheck_err e))
-(* | Error e -> *)
-(*     print_endline "error: "; *)
-(*     print_endline @@ show_typecheck_err e *)

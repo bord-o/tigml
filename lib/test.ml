@@ -37,7 +37,7 @@ let%expect_test "array expression translation length 3" =
     {|
     (Tree.ESeq (
        (Tree.Move ((Tree.Temp 7),
-          (Tree.Call ((Tree.Name ("init_record", 1)),
+          (Tree.Call ((Tree.Name ("init_array", 2)),
              [(Tree.Const 3); (Tree.Const 99)]))
           )),
        (Tree.Temp 7)))

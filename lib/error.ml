@@ -28,6 +28,7 @@ type typecheck_err =
   | `IfWithoutElseBranchMustBeUnitType of A.exp
   | `InvalidStaticLinkTraversal
   | `DuplicateNamesInRecursiveTypeDec
+  | `DuplicateNamesInRecursiveFuncDec
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
   | `NoDeclarations
