@@ -383,9 +383,11 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             in
             if T.detect_cycles types_with_headers then
               Error `IllegalCycleInTypeDec
-            else Ok (vars, types_with_headers)
+            else Ok (None, vars, types_with_headers)
         | A.VarDec { name; escape = _; typ; init; pos = _ } ->
-            let* _, init_ty = typecheck vars types init level break_context in
+            let* init_ir, init_ty =
+              typecheck vars types init level break_context
+            in
             let* var_ty =
               match typ with
               | None when resolv init_ty <>~ T.NIL -> Ok init_ty
@@ -397,13 +399,14 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                   | Some _ ->
                       Error (`VariableTypeAnnotationDoesntMatchExpression z))
             in
+            let alloc_loc = Translate.alloc_local true level in
             let new_vars =
               S.enter (S.symbol name)
-                (Env.VarEntry
-                   { access = Translate.alloc_local true level; ty = var_ty })
+                (Env.VarEntry { access = alloc_loc; ty = var_ty })
                 vars
             in
-            Ok (new_vars, types)
+            let* ir = Translate.var_dec alloc_loc level init_ir in
+            Ok (Some ir, new_vars, types)
         | A.FunctionDec fundecs ->
             let* () = T.detect_duplicate_func_names fundecs in
             let extract_formals params =
@@ -489,21 +492,24 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
               fundecs |> List.map check_function_body |> sequence_results
             in
 
-            Ok (vars_with_headers, types)
+            Ok (Some (Tree.Exp (Tree.Const 99)), vars_with_headers, types)
       in
 
-      let rec checkdecs vars types = function
-        | [] -> Ok (vars, types)
-        | d :: ds ->
-            let* new_vars, new_types = checkdec vars types d in
-            checkdecs new_vars new_types ds
+      let rec checkdecs acc vars types = function
+        | [] -> Ok (acc, vars, types)
+        | d :: ds -> (
+            let* ir_opt, new_vars, new_types = checkdec vars types d in
+            match ir_opt with
+            | None -> checkdecs acc new_vars new_types ds
+            | Some ir -> checkdecs (acc @ [ ir ]) new_vars new_types ds)
       in
 
-      let* new_vars, new_types = checkdecs vars types decs in
-      let* _, body_type =
+      let* dec_ir, new_vars, new_types = checkdecs [] vars types decs in
+      let* body_ir, body_type =
         typecheck new_vars new_types body level break_context
       in
-      Ok (Tree.Const 99, body_type)
+      let* ir = Translate.let_exp dec_ir body_ir in
+      Ok (ir, body_type)
 
 let typecheckProg' (p : Absyn.exp) =
   let vars =

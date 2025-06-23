@@ -13,6 +13,7 @@ type typecheck_err =
   | `CantReassignForLoopVariable of A.exp
   | `CantTreatRelopAsBinop
   | `CantTreatBinopAsRelop
+  | `DeclarationProducedNoIR
   | `ExpectedFunctionFoundVar of A.exp
   | `ExpectedVariableGotFunction of A.exp
   | `ForLoopBodyReturnsValue of A.exp
@@ -29,6 +30,7 @@ type typecheck_err =
   | `DuplicateNamesInRecursiveTypeDec
   | `InvalidOperation of A.exp
   | `NameTypeTranslationNotFound of string * A.pos
+  | `NoDeclarations
   | `RecordFieldDoesntExist of A.exp
   | `RecordFieldNamesAndTypesDontMatch of A.exp
   | `RecordFieldNamesDontMatch of A.exp

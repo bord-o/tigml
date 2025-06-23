@@ -272,3 +272,16 @@ let array_exp ~(size : exp) ~(init : exp) =
   ESeq
     ( Move (Temp alloc_loc, Frame.external_call "init_record" [ size; init ]),
       Temp alloc_loc )
+
+let var_dec (alloc_loc : access) level (init_ir : exp) =
+  let* var_ir = simple_var alloc_loc level in
+  Ok (Move (var_ir, init_ir))
+
+(* If we don't have any function decs or variable decs we just return body IR *)
+let let_exp (decs : stm list) (body : exp) =
+  let reduce f l =
+    match l with [] -> None | x :: xs -> Some (xs |> List.fold_left f x)
+  in
+  match reduce ( ++ ) decs with
+  | Some sequenced -> Ok (ESeq (sequenced, body))
+  | None -> Ok body
