@@ -290,6 +290,4 @@ let fun_dec_bodies (decs : stm list) =
   let reduce f l =
     match l with [] -> None | x :: xs -> Some (xs |> List.fold_left f x)
   in
-  match reduce ( ++ ) decs with
-  | Some sequenced -> Ok sequenced
-  | None -> Error `NoFunctionBodies
+  reduce ( ++ ) decs

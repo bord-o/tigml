@@ -501,8 +501,8 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
             let* body_ir_chunks =
               fundecs |> List.map check_function_body |> sequence_results
             in
-            let* body_seq = Translate.fun_dec_bodies body_ir_chunks in
-            Ok (Some body_seq, vars_with_headers, types)
+            let body_seq = Translate.fun_dec_bodies body_ir_chunks in
+            Ok (body_seq, vars_with_headers, types)
       in
 
       let rec checkdecs acc vars types = function
