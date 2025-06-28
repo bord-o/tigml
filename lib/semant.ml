@@ -602,8 +602,8 @@ let typecheckProg' (p : Absyn.exp) =
     |> Symbol.enter (Symbol.symbol "int") T.INT
     |> Symbol.enter (Symbol.symbol "string") T.STRING
   in
-  let* _typechecked, _type = typecheck vars types p Outermost None in
-  Ok ()
+  let* ir, _ = typecheck vars types p Outermost None in
+  Ok (ir)
 
 exception IDKBro of string
 
@@ -611,5 +611,5 @@ let typecheckProg p =
   break_check false p;
   let res = typecheckProg' p in
   match res with
-  | Ok _v -> ()
+  | Ok v -> v
   | Error e -> raise (IDKBro (Error.show_typecheck_err e))

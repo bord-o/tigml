@@ -7,9 +7,11 @@ something working that isn't a total mess.
 
 
 ## TODOs
-[ ] LetExp
-    [ ] VarDec
-    [ ] FunDec
+[ ] Fragments
+[ x ] Fix bug with upper bounds loops evaluating more than once
+[ x ] LetExp
+    [ x ] VarDec
+    [ x ] FunDec
 [ x ] ArrayExp
 [ x ] RecordExp
 [ x ] FieldVar
