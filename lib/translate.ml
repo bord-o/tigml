@@ -44,6 +44,15 @@ let alloc_local (escape : bool) = function
       let frame_access = Frame.alloc_local frame escape in
       (level, frame_access)
 
+let new_func frame body = 
+  let lab = Temp.new_label () in
+  let frag = Frame.Proc {
+      frame;
+      body
+  }  in
+  global_fragments := frag :: !global_fragments;
+  Tree.Label lab
+
 let new_string s =
   let lab = Temp.new_label () in
   let frag = Frame.String (lab, s) in

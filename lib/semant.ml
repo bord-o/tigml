@@ -531,7 +531,9 @@ let rec typecheck (vars : Env.enventry S.table) (types : T.ty S.table)
                   | Level l -> l.frame
                 in
 
-                Frame.proc_entry_exit_1 frame' (Tree.Exp body_ir)
+                let wrapped_body_ir = Frame.proc_entry_exit_1 frame' (Tree.Exp body_ir) in
+                Translate.new_func frame' wrapped_body_ir
+
               in
 
               if ty_eq actual_body_ty expected_result_ty then Ok wrapped_body_ir

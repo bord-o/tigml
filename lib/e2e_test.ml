@@ -9,7 +9,7 @@ let test_program filename should_pass =
     let file_content = really_input_string infile (in_channel_length infile) in
     let filebuf = Lexing.from_string file_content in
     let absyn = Parser.main Lexer.token filebuf in
-    Semant.typecheckProg absyn;
+    let _ir = Semant.typecheckProg absyn in
     close_in infile;
     should_pass
   with e ->
