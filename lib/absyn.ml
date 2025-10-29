@@ -21,55 +21,56 @@ type oper =
   | GeOp
 [@@deriving show, map]
 
-type var =
+module Open = struct
+type 'a var =
   | SimpleVar of symbol * pos
-  | FieldVar of var * symbol * pos
-  | SubscriptVar of var * exp * pos
-[@@deriving show, map]
+  | FieldVar of 'a var * symbol * pos
+  | SubscriptVar of 'a var * 'a exp * pos
+(* [@@deriving show, map, fold] *)
 
-and exp =
-  | VarExp of var
+and 'a exp =
+  | VarExp of 'a var
   | NilExp
   | IntExp of int
   | StringExp of string * pos
-  | CallExp of { func : symbol; args : exp list; pos : pos }
-  | OpExp of { left : exp; oper : oper; right : exp; pos : pos }
-  | RecordExp of { fields : (symbol * exp * pos) list; typ : symbol; pos : pos }
-  | SeqExp of (exp * pos) list
-  | AssignExp of { var : var; exp : exp; pos : pos }
-  | IfExp of { test : exp; then' : exp; else' : exp option; pos : pos }
-  | WhileExp of { test : exp; body : exp; pos : pos }
+  | CallExp of { func : symbol; args : 'a exp list; pos : pos }
+  | OpExp of { left : 'a exp; oper : oper; right : 'a exp; pos : pos }
+  | RecordExp of { fields : (symbol * 'a exp * pos) list; typ : symbol; pos : pos }
+  | SeqExp of ('a exp * pos) list
+  | AssignExp of { var : 'a var; exp : 'a exp; pos : pos }
+  | IfExp of { test : 'a exp; then' : 'a exp; else' : 'a exp option; pos : pos }
+  | WhileExp of { test : 'a exp; body : 'a exp; pos : pos }
   | ForExp of {
       var : symbol;
       escape : bool ref;
-      lo : exp;
-      hi : exp;
-      body : exp;
+      lo : 'a exp;
+      hi : 'a exp;
+      body : 'a exp;
       pos : pos;
     }
   | BreakExp of pos
-  | LetExp of { decs : dec list; body : exp; pos : pos }
-  | ArrayExp of { typ : symbol; size : exp; init : exp; pos : pos }
+  | LetExp of { decs : 'a dec list; body : 'a exp; pos : pos }
+  | ArrayExp of { typ : symbol; size : 'a exp; init : 'a exp; pos : pos }
 
 and field = { name : symbol; escape : bool ref; typ : symbol; pos : pos }
 
-and fundec = {
+and 'a fundec = {
   name : symbol;
   params : field list;
   result : (symbol * pos) option;
-  body : exp;
+  body : 'a exp;
   pos : pos;
 }
 
 and typedec = { name : symbol; ty : ty; pos : pos }
 
-and dec =
-  | FunctionDec of fundec list
+and 'a dec =
+  | FunctionDec of 'a fundec list
   | VarDec of {
       name : symbol;
       escape : bool ref;
       typ : (symbol * pos) option;
-      init : exp;
+      init : 'a exp;
       pos : pos;
     }
   | TypeDec of typedec list
@@ -78,4 +79,9 @@ and ty =
   | NameTy of symbol * pos
   | RecordTy of field list
   | ArrayTy of symbol * pos
-[@@deriving show]
+[@@deriving show, map]
+
+end
+
+type t
+type nnn = t Open.exp

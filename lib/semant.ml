@@ -16,6 +16,7 @@ let ( =~ ) = fun l r -> ty_eq l r || nullable (resolv l) (resolv r)
 let ( <>~ ) = fun l r -> not @@ ty_eq l r
 let ( let* ) = Result.bind
 
+
 (* TODO: This is dumb, write a proper map function over my AST or figure out the ppx_deriving one  *)
 let assigned_in exp var_name =
   let rec check_exp = function
